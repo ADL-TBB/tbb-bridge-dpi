@@ -75,6 +75,7 @@ class BaseLoader():
         #Complete the feature graphs for drugs
         self.dGraphFeat = np.array([i + [[0] * 75] * (self.dSeqMaxLen - len(i)) for i in self.dFeaData], dtype=np.int8)
         self.dFinprFeat = np.array(self.dFinData, dtype=np.float32)
+        self.dSmilesData = np.array(self.dSmilesData)
         
         #Get the boolean vector of seen and unseen proteins
         self.pSeen = self.get_seen_proteins()
@@ -257,12 +258,12 @@ class BaseLoader():
         pList = []
         for i in range(n_proteinIDs):
             protein = self.id2p[i]
-            pOneHot = np.zeros((len(protein), len(self.id2am)))
+            pOneHot = np.zeros((len(protein), len(self.id2am)), dtype = np.int8)
             for j in range(len(protein)):
                 aaID = self.am2id[protein[j]]
                 pOneHot[j,aaID] = 1
             pList.append(pOneHot)
-        return np.array(pList)
+        return np.array(pList, dtype = np.object)
        
     
     def one_epoch_batch_data_stream(self, batchSize=32, type='valid', device=torch.device('cpu')):
@@ -286,6 +287,8 @@ class BaseLoader():
                       "dSeqLen": torch.tensor(self.dSeqLen[dTokenizedNames], dtype=torch.int32).to(device),
                       "seenbool": torch.tensor(self.pSeen[pTokenizedNames], dtype=torch.bool).to(device),
                       "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.int8).to(device),
+                      "pOnehot_unclipped":self.pOneHot_unclipped[pTokenizedNames],
+                      "dSmilesData":self.dSmilesData[dTokenizedNames]
                     # add "seen" boolean
 
                   }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
@@ -310,9 +313,10 @@ class BaseLoader():
                           "atomSeq": torch.tensor(self.dSeqTokenized[dTokenizedNames], dtype=torch.long).to(device),
                           "dSeqLen": torch.tensor(self.dSeqLen[dTokenizedNames], dtype=torch.int32).to(device),
                           "seenbool": torch.tensor(self.pSeen[pTokenizedNames], dtype=torch.bool).to(device),
-                          "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.int8).to(device),
+                          "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.object).to(device),
+                          "pOnehot_unclipped":self.pOneHot_unclipped[pTokenizedNames],
+                          "dSmilesData":self.dSmilesData[dTokenizedNames]
                       }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
-
  
  
 
