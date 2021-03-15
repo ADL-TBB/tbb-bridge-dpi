@@ -387,8 +387,10 @@ class LoadCelegans(BaseLoader):
         return data
 
 
+data = "data"
 
-dataPath = "data/bindingdb"
+'''
+dataPath = os.path.join(data, "bindingdb")
 pSeqMaxLen=1024
 dSeqMaxLen=128
 kmers=-1
@@ -408,18 +410,20 @@ print(a)
 
 '''
 
-dataPath = "data/celegens/"
+dataPath = os.path.join(data, "celegans")
 pSeqMaxLen=1024
 dSeqMaxLen=128
 kmers=-1
 data = LoadCelegans(dataPath = dataPath)
 
+print(data.eSeqData['train'].shape)
+print(data.eSeqData['valid'].shape)
+print(data.eSeqData['test'].shape)
+
+print(data.pSeqTokenized[0])
+
 s=data.one_epoch_batch_data_stream()
 
 a = next(s)
 
-print(data.eSeqData['train'].shape)
-print(data.eSeqData['valid'].shape)
-print(data.eSeqData['test'].shape)
 print(a)
-'''
