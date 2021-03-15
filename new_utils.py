@@ -35,7 +35,7 @@ class BaseLoader():
         self.p2id, self.id2p = {}, [] 
         self.d2id,self.id2d = {},[]
         self.pSeqData = []
-        self.dMolData,self.dSeqData,self.dFeaData,self.dFinData = [],[],[],[]
+        self.dMolData,self.dSeqData,self.dFeaData,self.dFinData, self.dSmilesData = [],[],[],[],[]
         self.pNameData, self.dNameData = {}, {}
         
         #Import the data as {'train'/'valid'/'test': [drug, protein, label]}
@@ -81,6 +81,8 @@ class BaseLoader():
         
         #Get one-hot encoded proteins, i.e. for every protein a 2D array [pSeqMaxLen, n_aminoacids]
         self.pOnehot = self.get_onehot_proteins()
+        self.pOneHot_unclipped = self.get_onehot_proteins_unclipped()
+        
         
         print("Done")
         
@@ -107,6 +109,7 @@ class BaseLoader():
             return False
         
     def get_drug_features(self, drug):
+        self.dSmilesData.append(drug)
         mol = Chem.MolFromSmiles(drug)
         self.dMolData.append( mol )
         self.dSeqData.append( [a.GetSymbol() for a in mol.GetAtoms()] )
@@ -242,10 +245,27 @@ class BaseLoader():
                 aaID = protein[j]
                 pOnehot[i,j,aaID] = 1
         return pOnehot
-  
+    
+    def get_onehot_proteins_unclipped(self):
+        '''
+        Create one-hot encoded proteins without defining a maximum length.
+        For every protein a 2D array [protein length, amino acids]: for every row/place in the sequence
+        a 1 at the index of the amino acid that's present there.
+        '''
+        n_proteinIDs = len(self.id2p)
+        n_aminoIDs = len(self.id2am)
+        pList = []
+        for i in range(n_proteinIDs):
+            protein = self.id2p[i]
+            pOneHot = np.zeros((len(protein), len(self.id2am)))
+            for j in range(len(protein)):
+                aaID = self.am2id[protein[j]]
+                pOneHot[j,aaID] = 1
+            pList.append(pOneHot)
+        return np.array(pList)
        
     
-    def one_epoch_batch_data_stream(self, batchSize=32, type='valid', mode='predict', device=torch.device('cpu')):
+    def one_epoch_batch_data_stream(self, batchSize=32, type='valid', device=torch.device('cpu')):
         edges = self.eSeqData[type]
         indexes = np.arange(len(edges))
         np.random.shuffle(indexes)
@@ -253,6 +273,7 @@ class BaseLoader():
         for i in range((len(edges) + batchSize - 1) // batchSize):
             samples = edges[i * batchSize:(i + 1) * batchSize]
             pTokenizedNames, dTokenizedNames = [i[0] for i in samples], [i[1] for i in samples]
+            print(pTokenizedNames)
 
             yield {
                       "res": True,
@@ -269,7 +290,7 @@ class BaseLoader():
 
                   }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
             
-    def random_batch_data_stream(self, batchSize=32, type='train', sampleType='CEL', device=torch.device('cpu'),
+    def random_batch_data_stream(self, batchSize=32, type='train', device=torch.device('cpu'),
                                  log=False):
         edges = [i for i in self.eSeqData[type]]
         while True:
@@ -292,6 +313,7 @@ class BaseLoader():
                           "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.int8).to(device),
                       }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
 
+ 
  
 
 
