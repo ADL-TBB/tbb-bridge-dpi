@@ -133,7 +133,7 @@ class BaseLoader():
                     self.get_drug_features(drug)
                     dCnt += 1
                 id_data.append([self.p2id[protein], self.d2id[drug], label])
-            self.eSeqData[sub] = np.array(id_data)
+            self.eSeqData[sub] = np.array(id_data, dtype = np.int32)
             
     def get_aminoacid_id(self):
         '''
@@ -369,7 +369,7 @@ class LoadCelegans(BaseLoader):
             if line == '':
                 break
             drug, protein, label = line.strip().split(' ')
-            temp.append([drug, protein, label])
+            temp.append([drug, protein, int(label)])
         file.close()
         data = self.create_sets(temp, valid_size, test_size)
         return data
@@ -387,10 +387,8 @@ class LoadCelegans(BaseLoader):
         return data
 
 
-data = "data"
-
 '''
-dataPath = os.path.join(data, "bindingdb")
+dataPath = "data/bindingdb"
 pSeqMaxLen=1024
 dSeqMaxLen=128
 kmers=-1
@@ -407,23 +405,19 @@ print(data.eSeqData['train'].shape)
 print(data.eSeqData['valid'].shape)
 print(data.eSeqData['test'].shape)
 print(a)
-
 '''
 
-dataPath = os.path.join(data, "celegans")
+dataPath = "data/celegens/"
 pSeqMaxLen=1024
 dSeqMaxLen=128
 kmers=-1
 data = LoadCelegans(dataPath = dataPath)
 
-print(data.eSeqData['train'].shape)
-print(data.eSeqData['valid'].shape)
-print(data.eSeqData['test'].shape)
-
-print(data.pSeqTokenized[0])
-
 s=data.one_epoch_batch_data_stream()
 
 a = next(s)
 
+print(data.eSeqData['train'].shape)
+print(data.eSeqData['valid'].shape)
+print(data.eSeqData['test'].shape)
 print(a)
