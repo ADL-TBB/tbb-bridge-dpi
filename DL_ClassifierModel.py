@@ -94,7 +94,7 @@ class BaseClassifier:
               optimType='Adam', preheat=5, lr1=0.001, lr2=0.00003, momentum=0.9, weightDecay=0, isHigherBetter=True,
               metrics="AUC", report=["ACC", "AUC"],
               savePath='model'):
-        dataClass.describe()
+        # dataClass.describe()
         assert batchSize % trainSize == 0
         metrictor = Metrictor()
         self.stepCounter = 0
@@ -105,14 +105,14 @@ class BaseClassifier:
         optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.moduleList.parameters()), lr=lr1, weight_decay=weightDecay)
         schedulerRLR = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max' if isHigherBetter else 'min', factor=0.5, patience=4, verbose=True)
 
-        # Get random training stream from training data obtained using trainIdList (if I'm not wrong)
-        trainStream = dataClass.random_batch_data_stream(batchSize=trainSize, type='train', sampleType=self.sampleType, device=self.device)
+        # Get random training stream
+        trainStream = dataClass.random_batch_data_stream(batchSize=trainSize, type='train', device=self.device)
         itersPerEpoch = (dataClass.trainSampleNum + trainSize - 1) // trainSize
         mtc, bestMtc, stopSteps = 0.0, 0.0, 0
 
-        # Get random validation stream from training data obtained using validationIdList (if I'm not wrong)
+        # Get random validation stream
         if dataClass.validSampleNum > 0:
-            validStream = dataClass.random_batch_data_stream(batchSize=trainSize, type='valid', sampleType=self.sampleType, device=self.device, log=True)
+            validStream = dataClass.random_batch_data_stream(batchSize=trainSize, type='valid', device=self.device, log=True)
 
         st = time.time()
         print('Start pre-heat training:')
@@ -156,7 +156,7 @@ class BaseClassifier:
                 print(f'========== Epoch:{e + 1:5d} ==========')
 
                 Y_pre, Y = self.calculate_y_prob_by_iterator(dataClass.one_epoch_batch_data_stream(
-                    trainSize, type='train', mode='predict', device=self.device))
+                    trainSize, type='train', device=self.device))
                     
                 metrictor.set_data(Y_pre, Y)
                 print(f'[Total Train]', end='')
@@ -164,7 +164,7 @@ class BaseClassifier:
                 print(f'[Total Valid]', end='')
 
                 Y_pre, Y = self.calculate_y_prob_by_iterator(dataClass.one_epoch_batch_data_stream(
-                    trainSize, type='valid', mode='predict', device=self.device))
+                    trainSize, type='valid', device=self.device))
 
                 metrictor.set_data(Y_pre, Y)
                 res = metrictor(report)
@@ -190,21 +190,20 @@ class BaseClassifier:
 
         print(f'[Total Train]', end='')
         Y_pre, Y = self.calculate_y_prob_by_iterator(dataClass.one_epoch_batch_data_stream(
-            trainSize, type='train', mode='predict', device=self.device))
+            trainSize, type='train', device=self.device))
         metrictor.set_data(Y_pre, Y)
         metrictor(report)
 
         print(f'[Total Valid]', end='')
         Y_pre, Y = self.calculate_y_prob_by_iterator(dataClass.one_epoch_batch_data_stream(
-            trainSize, type='valid', mode='predict', device=self.device))
+            trainSize, type='valid', device=self.device))
         metrictor.set_data(Y_pre, Y)
         res = metrictor(report)
 
-        # I think this is always zero
         if dataClass.testSampleNum > 0:
             print(f'[Total Test]', end='')
             Y_pre, Y = self.calculate_y_prob_by_iterator(dataClass.one_epoch_batch_data_stream(
-                trainSize, type='test', mode='predict', device=self.device))
+                trainSize, type='test', device=self.device))
             metrictor.set_data(Y_pre, Y)
             metrictor(report)
         # metrictor.each_class_indictor_show(dataClass.id2lab)
@@ -277,10 +276,6 @@ class BaseClassifier:
         Y_pre = self.calculate_y_logit(X, mode)['y_logit']
         return torch.sigmoid(Y_pre)
 
-    # def calculate_y(self, X):
-    #     Y_pre = self.calculate_y_prob(X)
-    #     return torch.argmax(Y_pre, dim=1)
-
     def calculate_loss(self, X, Y):
         out = self.calculate_y_logit(X, 'predict')
         Y_logit = out['y_logit']
@@ -329,11 +324,6 @@ class BaseClassifier:
         YArr, Y_preArr, seenbool = np.hstack(YArr).astype('int32'), np.hstack(Y_preArr).astype('float32'), np.hstack(seenbool).astype(bool)
         return Y_preArr, YArr, seenbool
 
-
-    # def calculate_y_by_iterator(self, dataStream):
-    #     Y_preArr, YArr = self.calculate_y_prob_by_iterator(dataStream)
-    #     return Y_preArr.argmax(axis=1), YArr
-
     def to_train_mode(self):
         for module in self.moduleList:
             module.train()
@@ -362,153 +352,13 @@ class BaseClassifier:
         return loss * self.stepUpdate
 
 
-class DTI_E2E(BaseClassifier):
-    def __init__(self, amEmbedding, goEmbedding, atEmbedding, seqMaxLen,
-                 rnnHiddenSize=16, gcnHiddenSize=64, gcnSkip=3, fcHiddenSize=32, dropout=0.1, gama=0.0005,
-                 embFreeze=False, sampleType='PWRL', device=torch.device('cuda')):
-        self.amEmbedding = TextEmbedding(torch.tensor(
-            amEmbedding, dtype=torch.float32), dropout, freeze=embFreeze, name='amEmbedding').to(device)
-        self.goEmbedding = TextEmbedding(torch.tensor(
-            goEmbedding, dtype=torch.float32), dropout, freeze=False, name='goEmbedding').to(device)
-        self.atEmbedding = TextEmbedding(torch.tensor(
-            atEmbedding, dtype=torch.float32), dropout, freeze=embFreeze, name='atEmbedding').to(device)
-        self.pBiLSTM = TextLSTM(
-            amEmbedding.shape[1], rnnHiddenSize, bidirectional=False, name='pBiLSTM').to(device)
-        self.dGCN = GCN(atEmbedding.shape[0], atEmbedding.shape[1], gcnHiddenSize, [
-            gcnHiddenSize] * (gcnSkip - 1), name='dGCN').to(device)
-        self.U = MLP(gcnHiddenSize, rnnHiddenSize,
-                     dropout=0.0, name='U').to(device)
-        self.pFcLinear = MLP(rnnHiddenSize, fcHiddenSize, [
-            fcHiddenSize] * 2, dropout=dropout, name='pFcLinear').to(device)
-        self.dFcLinear = MLP(gcnHiddenSize, fcHiddenSize, [
-            fcHiddenSize] * 2, dropout=dropout, name='dFcLinear').to(device)
-        self.criterion = PairWiseRankingLoss(
-            gama) if sampleType == 'PWRL' else torch.nn.BCEWithLogitsLoss()
-        self.embModuleList = nn.ModuleList(
-            [self.amEmbedding, self.goEmbedding, self.atEmbedding])
-        self.finetunedEmbList = nn.ModuleList(
-            [self.amEmbedding, self.goEmbedding, self.atEmbedding])
-        self.moduleList = nn.ModuleList([self.amEmbedding, self.goEmbedding, self.atEmbedding,
-                                         self.pBiLSTM, self.dGCN, self.U, self.pFcLinear, self.dFcLinear])
-        self.sampleType = sampleType
-        self.device = device
-
-    def calculate_y_logit(self, X, mode='train'):
-        # => batchSize1 × amSeqLen, batchSize1 × goSeqLen, batchSize2 × nodeNum × nodeNum
-        Xam, Xgo, Xat = X['aminoSeq'], X['goSeq'], X['atomGra']
-        # => batchSize1 × amSeqLen × amSize, batchSize1 × goSeqLen × goSize
-        Xam = self.amEmbedding(Xam)
-        Xgo = self.goEmbedding(Xgo)
-        Xam = self.pBiLSTM(Xam)  # => batchSize1 × amSeqLen × rnnHiddenSize
-
-        # => batchSize1 × (amSeqLen+goSeqLen) × rnnHiddenSize
-        P = torch.cat([Xam, Xgo], dim=1)
-        # => batchSize2 × nodeNum × gcnHiddenSize
-        D = self.dGCN(self.atEmbedding.embedding.weight, Xat)
-
-        if mode == 'train':
-            # => batchSize1 × 1 × (amSeqLen+goSeqLen) × rnnHiddenSize
-            P = P.unsqueeze(dim=1)
-            # => 1 × batchSize2 × nodeNum × gcnHiddenSize
-            D = D.unsqueeze(dim=0)
-
-        # => batchSize1 × batchSize2 × (amSeqLen+goSeqLen) × nodeNum
-        alpha = F.tanh(torch.matmul(torch.matmul(
-            P, self.U.out.weight), D.transpose(-1, -2)))
-        # => batchSize1 × batchSize2 × (amSeqLen+goSeqLen)
-        pAlpha, _ = torch.max(alpha, dim=-1)
-        # => batchSize1 × batchSize2 × nodeNum
-        dAlpha, _ = torch.max(alpha, dim=-2)
-
-        # => batchSize1 × batchSize2 × 1 × (amSeqLen+goSeqLen)
-        pAlpha = F.softmax(pAlpha, dim=-1).unsqueeze(dim=-2)
-        # => batchSize1 × batchSize2 × 1 × nodeNum
-        dAlpha = F.softmax(dAlpha, dim=-1).unsqueeze(dim=-2)
-
-        # => batchSize1 × batchSiz2 × rnnHiddenSize, batchSize1 × batchSize2 × gcnHiddenSize
-        Xp, Xd = torch.matmul(pAlpha, P).squeeze(
-            dim=-2), torch.matmul(dAlpha, D).squeeze(dim=-2)
-        # => batchSize1 × batchSiz2 × fcHiddenSize, batchSize1 × batchSiz2 × fcHiddenSize
-        Xp, Xd = self.pFcLinear(Xp), self.dFcLinear(Xd)
-        # => batchSize1 × batchSiz2
-        return {"y_logit": torch.sum(Xp * Xd, dim=-1)}
-
-
-class DTI_E2E_nogo(BaseClassifier):
-    def __init__(self, amEmbedding, atEmbedding, seqMaxLen,
-                 rnnHiddenSize=16, gcnHiddenSize=64, gcnSkip=3, fcHiddenSize=32, dropout=0.1, gama=0.0005,
-                 embFreeze=False, sampleType='PWRL', device=torch.device('cuda')):
-        self.amEmbedding = TextEmbedding(torch.tensor(
-            amEmbedding, dtype=torch.float32), dropout, freeze=embFreeze, name='amEmbedding').to(device)
-        self.atEmbedding = TextEmbedding(torch.tensor(
-            atEmbedding, dtype=torch.float32), dropout, freeze=embFreeze, name='atEmbedding').to(device)
-        self.pBiLSTM = TextLSTM(
-            amEmbedding.shape[1], rnnHiddenSize, bidirectional=False, name='pBiLSTM').to(device)
-        self.dGCN = GCN(atEmbedding.shape[0], atEmbedding.shape[1], gcnHiddenSize, [
-            gcnHiddenSize] * (gcnSkip - 1), name='dGCN').to(device)
-        self.U = MLP(gcnHiddenSize, rnnHiddenSize,
-                     dropout=0.0, name='U').to(device)
-        self.pFcLinear = MLP(rnnHiddenSize, fcHiddenSize, [
-            fcHiddenSize] * 2, dropout=dropout, name='pFcLinear').to(device)
-        self.dFcLinear = MLP(gcnHiddenSize, fcHiddenSize, [
-            fcHiddenSize] * 2, dropout=dropout, name='dFcLinear').to(device)
-        self.criterion = PairWiseRankingLoss(
-            gama) if sampleType == 'PWRL' else torch.nn.BCEWithLogitsLoss()
-        self.embModuleList = nn.ModuleList(
-            [self.amEmbedding, self.atEmbedding])
-        self.finetunedEmbList = nn.ModuleList(
-            [self.amEmbedding, self.atEmbedding])
-        self.moduleList = nn.ModuleList([self.amEmbedding, self.atEmbedding,
-                                         self.pBiLSTM, self.dGCN, self.U, self.pFcLinear, self.dFcLinear])
-        self.sampleType = sampleType
-        self.device = device
-
-    def calculate_y_logit(self, X, mode='train'):
-        # => batchSize1 × amSeqLen, batchSize1 × goSeqLen, batchSize2 × nodeNum × nodeNum
-        Xam, Xat = X['aminoSeq'], X['atomGra']
-        # => batchSize1 × amSeqLen × amSize, batchSize1 × goSeqLen × goSize
-        Xam = self.amEmbedding(Xam)
-        Xam = self.pBiLSTM(Xam)  # => batchSize1 × amSeqLen × rnnHiddenSize
-
-        P = Xam  # => batchSize1 × (amSeqLen+goSeqLen) × rnnHiddenSize
-        # => batchSize2 × nodeNum × gcnHiddenSize
-        D = self.dGCN(self.atEmbedding.embedding.weight, Xat)
-
-        if mode == 'train':
-            # => batchSize1 × 1 × (amSeqLen+goSeqLen) × rnnHiddenSize
-            P = P.unsqueeze(dim=1)
-            # => 1 × batchSize2 × nodeNum × gcnHiddenSize
-            D = D.unsqueeze(dim=0)
-
-        # => batchSize1 × batchSize2 × (amSeqLen+goSeqLen) × nodeNum
-        alpha = F.tanh(torch.matmul(torch.matmul(
-            P, self.U.out.weight), D.transpose(-1, -2)))
-        # => batchSize1 × batchSize2 × (amSeqLen+goSeqLen)
-        pAlpha, _ = torch.max(alpha, dim=-1)
-        # => batchSize1 × batchSize2 × nodeNum
-        dAlpha, _ = torch.max(alpha, dim=-2)
-
-        # => batchSize1 × batchSize2 × 1 × (amSeqLen+goSeqLen)
-        pAlpha = F.softmax(pAlpha, dim=-1).unsqueeze(dim=-2)
-        # => batchSize1 × batchSize2 × 1 × nodeNum
-        dAlpha = F.softmax(dAlpha, dim=-1).unsqueeze(dim=-2)
-
-        # => batchSize1 × batchSiz2 × rnnHiddenSize, batchSize1 × batchSize2 × gcnHiddenSize
-        Xp, Xd = torch.matmul(pAlpha, P).squeeze(
-            dim=-2), torch.matmul(dAlpha, D).squeeze(dim=-2)
-        # => batchSize1 × batchSiz2 × fcHiddenSize, batchSize1 × batchSiz2 × fcHiddenSize
-        Xp, Xd = self.pFcLinear(Xp), self.dFcLinear(Xd)
-        # => batchSize1 × batchSiz2
-        return {"y_logit": torch.sum(Xp * Xd, dim=-1)}
-
-
 class DTI_Bridge(BaseClassifier):
     def __init__(self, outSize,
                  cHiddenSizeList,
                  fHiddenSizeList,
                  fSize=1024, cSize=8422,
                  gcnHiddenSizeList=[], fcHiddenSizeList=[], nodeNum=32, resnet=True,
-                 hdnDropout=0.1, fcDropout=0.2, device=torch.device('cuda'), sampleType='CEL',
+                 hdnDropout=0.1, fcDropout=0.2, device=torch.device('cuda'),
                  useFeatures={"kmers": True, "pSeq": True,
                               "FP": True, "dSeq": True},
                  maskDTI=False):
@@ -545,7 +395,6 @@ class DTI_Bridge(BaseClassifier):
         self.moduleList = nn.ModuleList(
             [self.nodeEmbedding, self.cFcLinear, self.fFcLinear, self.nodeGCN, self.fcLinear,
              self.amEmbedding, self.pCNN, self.pFcLinear, self.dCNN, self.dFcLinear])
-        self.sampleType = sampleType
         self.device = device
         self.resnet = resnet
         self.nodeNum = nodeNum

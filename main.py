@@ -10,29 +10,28 @@ from time import time
 from pathlib import Path
 
 dataset = 'bindingdb' # celegans / human / bindingdb
-start = time()
+
 if dataset=='celegans':
     model_path = Path("results/celegans_cv1_993.pkl")
     data_path = Path("data/celegans/data.txt")
     data_class = DataClass_normal(dataPath=data_path)
+
 elif dataset=='human':
     model_path = Path("results/human_cv1_985.pkl")
     data_path = Path("data/human/data.txt")
     data_class = DataClass_normal(dataPath=data_path)
+
 else: #bindingdb
-    model_path = Path("results/bindingdb_958.pkl")
+    model_path = Path("../results/new_utils_test_bindingdb_962.pkl")
     data_path = Path("data/bindingdb")
     data_class = DataClass(dataPath=data_path)
 
-print("That took {} seconds".format(time()-start))
-'''
 model = DTI_Bridge(outSize=128,
                    cHiddenSizeList=[1024],
                    fHiddenSizeList=[1024, 256],
                    fSize=1024, cSize=data_class.pContFeat.shape[1],
                    gcnHiddenSizeList=[128, 128], fcHiddenSizeList=[128], nodeNum=64,
                    hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'))
-
 model.load(path=model_path, map_location="cuda", dataClass=data_class)
 model.to_eval_mode()
 
@@ -61,9 +60,18 @@ def get_metrics(database):
         print("\nAccuracy on SEEN proteins in validation set:", seen_correct/n_seen)
         print("Accuracy on UNSEEN proteins in validation set:", unseen_correct/n_unseen)
         print("\nAccuracy and AUC on total validation set:")
-
     else: # bindingdb
         test = np.array(data_class.eSeqData['test'])
+        print("TEST1:",test[0])
+        print("TEST2:",test[1])
+        print("TEST3:",test[2])
+        
+        ones = 0
+        for i in range(len(test)):
+            if test[i,2]==1:
+                ones += 1
+        print("NUMBER OF 1 LABELS:", ones)
+    
         Ypre, Y, seenbool = model.calculate_y_with_seenbool(data_class.one_epoch_batch_data_stream(batchSize=128, type='test', device=torch.device('cuda')))
         Y_heavi = np.where(Ypre>=0.5, 1, 0)
         n_seen, n_unseen, seen_correct, unseen_correct = seen_stats(test, seenbool, Y_heavi, Y)
@@ -78,10 +86,7 @@ def get_metrics(database):
     report = ["ACC", "AUC"]
     metrictor(report)
 
-
 print("\nNumber of training examples:", data_class.trainSampleNum)
 print("Number of valid examples:", data_class.validSampleNum)
 print("Number of test examples:", data_class.testSampleNum)
-
 get_metrics(dataset)
-'''

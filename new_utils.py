@@ -85,7 +85,7 @@ class BaseLoader():
         self.pOneHot_unclipped = self.get_onehot_proteins_unclipped()
         
         
-        print("Done")
+        print("Done\n")
         
         
     def load_data(self):
@@ -180,8 +180,8 @@ class BaseLoader():
         pSeqLen = []
         for pSeq in self.pSeqData:
             pSeq = [self.am2id[am] for am in pSeq]
-            pSeqLen.append(min(len(pSeq), pSeqMaxLen))
-            pSeqTokenized.append(pSeq[:pSeqMaxLen] + [1] * max(pSeqMaxLen - len(pSeq), 0))
+            pSeqLen.append(min(len(pSeq), self.pSeqMaxLen))
+            pSeqTokenized.append(pSeq[:self.pSeqMaxLen] + [1] * max(self.pSeqMaxLen - len(pSeq), 0))
         return pSeqTokenized, pSeqLen 
     
     
@@ -196,9 +196,9 @@ class BaseLoader():
         dSeqLen = []
         for dSeq in self.dSeqData:
             atoms = [self.at2id[i] for i in dSeq]
-            dSeqLen.append(min(len(dSeq), dSeqMaxLen))
+            dSeqLen.append(min(len(dSeq), self.dSeqMaxLen))
             dSeqTokenized.append(
-                atoms[:dSeqMaxLen] + [1] * max(dSeqMaxLen - len(atoms), 0))
+                atoms[:self.dSeqMaxLen] + [1] * max(self.dSeqMaxLen - len(atoms), 0))
         return dSeqTokenized, dSeqLen
     
     def get_protein_kmer_features(self):
@@ -218,14 +218,14 @@ class BaseLoader():
         pContFeat = (pContFeat - pContFeat.mean(axis=0)) /                     (pContFeat.std(axis=0) + 1e-8)
         return pContFeat    
     
-    # Stores for each protein whether it's seen in train and TEST set (warning if test set is empty)
+    # Stores for each protein whether it's seen in train and TEST set
     def get_seen_proteins(self):
-        # Introduced 'pSeen': for each protein boolean indicating whether the protein is in both train/test set
         train, test = self.eSeqData['train'], self.eSeqData['test']
         pSeen = [False] * (len(self.pSeqData))
-        for i in range(len(pSeen)):
-            if np.any(train[:,0]==i) and np.any(test[:,0]==i): # Test set is used for BindingDB
-                pSeen[i] = True
+        if len(test) > 0: # Only if there is a test set
+            for i in range(len(pSeen)):
+                if np.any(train[:,0]==i) and np.any(test[:,0]==i):
+                    pSeen[i] = True
         return np.array(pSeen, dtype=np.bool)
         
     # Dependent on self.pSeqTokenized!
@@ -239,10 +239,10 @@ class BaseLoader():
         '''
         n_proteinIDs = len(self.id2p)
         n_aminoIDs = len(self.id2am)
-        pOnehot = np.zeros((n_proteinIDs,pSeqMaxLen,n_aminoIDs), dtype=np.int8)
+        pOnehot = np.zeros((n_proteinIDs,self.pSeqMaxLen,n_aminoIDs), dtype=np.int8)
         for i in range(n_proteinIDs):
             protein = self.pSeqTokenized[i]
-            for j in range(pSeqMaxLen):
+            for j in range(self.pSeqMaxLen):
                 aaID = protein[j]
                 pOnehot[i,j,aaID] = 1
         return pOnehot
@@ -274,8 +274,7 @@ class BaseLoader():
         for i in range((len(edges) + batchSize - 1) // batchSize):
             samples = edges[i * batchSize:(i + 1) * batchSize]
             pTokenizedNames, dTokenizedNames = [i[0] for i in samples], [i[1] for i in samples]
-            print(pTokenizedNames)
-
+           
             yield {
                       "res": True,
                       "aminoSeq": torch.tensor(self.pSeqTokenized[pTokenizedNames], dtype=torch.long).to(device),
@@ -289,8 +288,6 @@ class BaseLoader():
                       "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.int8).to(device),
                       "pOnehot_unclipped":self.pOneHot_unclipped[pTokenizedNames],
                       "dSmilesData":self.dSmilesData[dTokenizedNames]
-                    # add "seen" boolean
-
                   }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
             
     def random_batch_data_stream(self, batchSize=32, type='train', device=torch.device('cpu'),
@@ -313,7 +310,7 @@ class BaseLoader():
                           "atomSeq": torch.tensor(self.dSeqTokenized[dTokenizedNames], dtype=torch.long).to(device),
                           "dSeqLen": torch.tensor(self.dSeqLen[dTokenizedNames], dtype=torch.int32).to(device),
                           "seenbool": torch.tensor(self.pSeen[pTokenizedNames], dtype=torch.bool).to(device),
-                          "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.object).to(device),
+                          "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.int8).to(device),
                           "pOnehot_unclipped":self.pOneHot_unclipped[pTokenizedNames],
                           "dSmilesData":self.dSmilesData[dTokenizedNames]
                       }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
@@ -322,7 +319,6 @@ class BaseLoader():
 
 
 class LoadBindingDB(BaseLoader):
-
     def load_data(self, dataPath):
         '''
         Read file and return data as list of [drug, protein, label]
@@ -355,9 +351,9 @@ class LoadBindingDB(BaseLoader):
                     else:
                         label = '1'
                     if folder!='dev':
-                        data[folder].append([drug, protein, int(label)])
+                        data[folder].append(np.array((drug, protein, int(label))))
                     else:
-                        data['valid'].append([drug, protein, int(label)])
+                        data['valid'].append(np.array((drug, protein, int(label))))
                 file.close()
         return data
 
@@ -395,14 +391,13 @@ class LoadCelegans(BaseLoader):
             if line == '':
                 break
             drug, protein, label = line.strip().split(' ')
-            temp.append([drug, protein, int(label)])
+            temp.append(np.array((drug, protein, int(label))))
         file.close()
         data = self.create_sets(temp, valid_size, test_size)
         return data
 
-    # Should we shuffle the data???
     def create_sets(self, temp, valid_size, test_size):
-#         random.shuffle(temp) # <<^^
+        random.shuffle(temp)
         data = {'train': [], 'valid': [], 'test': []}
         samples = len(temp)
         split1 = int((1-valid_size-test_size)*samples)
@@ -431,9 +426,8 @@ print(data.eSeqData['train'].shape)
 print(data.eSeqData['valid'].shape)
 print(data.eSeqData['test'].shape)
 print(a)
-'''
 
-dataPath = "data/celegens/"
+dataPath = "data/celegens"
 pSeqMaxLen=1024
 dSeqMaxLen=128
 kmers=-1
@@ -447,3 +441,4 @@ print(data.eSeqData['train'].shape)
 print(data.eSeqData['valid'].shape)
 print(data.eSeqData['test'].shape)
 print(a)
+'''
