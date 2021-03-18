@@ -1,17 +1,12 @@
 import numpy as np
-import pandas as pd
 import torch
 import time
 import os
-import pickle
-# Deleted: import random
 from torch import nn as nn
 from nnLayer import *
 from metrics import *
-from collections import Counter, Iterable
-from sklearn.model_selection import StratifiedKFold, KFold
+from sklearn.model_selection import KFold
 from torch.backends import cudnn
-from tqdm import tqdm
 from Others import *
 
 
@@ -27,30 +22,32 @@ class BaseClassifier:
                  isHigherBetter=True, metrics="AUC", report=["ACC", "AUC"],
                  savePath='model', seed=9527, loc=-1):
 
-        skf = StratifiedKFold(n_splits=kFold, random_state=seed, shuffle=True)
+        skf = KFold(n_splits=kFold, random_state=seed, shuffle=True)
 
-        validRes = []
-        # dataClass.trainIdList+dataClass.validIdList
-        tvIdList = list(range(dataClass.trainSampleNum + dataClass.validSampleNum)) # ID list of all training+valid examples
-        # self._save_emb('cache/_preEmbedding.pkl')
-        for i, (trainIndices, validIndices) in enumerate(skf.split(tvIdList, [i[2] for i in dataClass.eSeqData])): # ValueError: Found input variables with inconsistent numbers of samples: [55762, 3]
+        data = np.concatenate((dataClass.eSeqData['train'], dataClass.eSeqData['valid']))
+
+        results = []
+        for i, (train_index, test_index) in enumerate(skf.split(data)):
+            dataClass.eSeqData['train'] = data[train_index]
+            dataClass.eSeqData['valid'] = data[test_index]
+            dataClass.trainSampleNum = len(dataClass.eSeqData['train'])
+            dataClass.validSampleNum = len(dataClass.eSeqData['valid'])
+            dataClass.pSeen = dataClass.get_seen_proteins()
             print(f'CV_{i + 1}:')
             if loc > 0 and i + 1 != loc:
                 print(f'Pass CV_{i + 1}')
                 continue
             self.reset_parameters()
-            # self._load_emb('cache/_preEmbedding.pkl')
-
-            # dataclass' train- and valid-IDs are set according to skf.split() above (so they are now different from previously defined in utils.py during preprocessing)
-            dataClass.trainIdList, dataClass.validIdList = trainIndices, validIndices
-            dataClass.trainSampleNum, dataClass.validSampleNum = len(trainIndices), len(validIndices)
-
             res = self.train(dataClass, trainSize, batchSize, epoch, stopRounds, earlyStop, saveRounds, optimType,
                              preheat, lr1, lr2, momentum, weightDecay,
                              isHigherBetter, metrics, report, f"{savePath}_cv{i + 1}")
-            validRes.append(res)
-        Metrictor.table_show(validRes, report)
-
+            results.append(res)
+        Metrictor.table_show(results, report)
+        if dataClass.testSampleNum > 0:
+            print("(Results on test set)")
+        else:
+            print("(Results on validation set)")
+        
     def cv_train_by_protein(self, dataClass, trainSize=256, batchSize=256, epoch=100, stopRounds=10, earlyStop=10,
                             saveRounds=1,
                             optimType='Adam', preheat=5, lr1=0.001, lr2=0.00003, momentum=0.9, weightDecay=0, kFold=5,
@@ -94,7 +91,6 @@ class BaseClassifier:
               optimType='Adam', preheat=5, lr1=0.001, lr2=0.00003, momentum=0.9, weightDecay=0, isHigherBetter=True,
               metrics="AUC", report=["ACC", "AUC"],
               savePath='model'):
-        # dataClass.describe()
         assert batchSize % trainSize == 0
         metrictor = Metrictor()
         self.stepCounter = 0
@@ -112,7 +108,7 @@ class BaseClassifier:
 
         # Get random validation stream
         if dataClass.validSampleNum > 0:
-            validStream = dataClass.random_batch_data_stream(batchSize=trainSize, type='valid', device=self.device, log=True)
+            validStream = dataClass.random_batch_data_stream(batchSize=trainSize, type='valid', device=self.device)
 
         st = time.time()
         print('Start pre-heat training:')
@@ -206,7 +202,7 @@ class BaseClassifier:
                 trainSize, type='test', device=self.device))
             metrictor.set_data(Y_pre, Y)
             metrictor(report)
-        # metrictor.each_class_indictor_show(dataClass.id2lab)
+            res = metrictor(report) # Report test scores if there is a test set
         print(f'================================')
         return res
 
@@ -444,10 +440,3 @@ class DTI_Bridge(BaseClassifier):
         # , "loss":1*l2}
         return {"y_logit": self.fcLinear(node_embed).squeeze(dim=1)}
 
-
-def get_index(seqData, sP, sD):
-    sPsD = [i[0] in sP and i[1] in sD for i in seqData]
-    sPuD = [i[0] in sP and i[1] not in sD for i in seqData]
-    uPsD = [i[0] not in sP and i[1] in sD for i in seqData]
-    uPuD = [i[0] not in sP and i[1] not in sD for i in seqData]
-    return sPsD, sPuD, uPsD, uPuD

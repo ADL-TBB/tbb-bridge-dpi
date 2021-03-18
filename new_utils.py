@@ -1,17 +1,5 @@
-#For splitting between train and test
-from sklearn.model_selection import train_test_split
-#To one-hot encode data
-from sklearn.preprocessing import OneHotEncoder
-#The word2vec model will take strings and convert them to embeddings 
-from gensim.models import Word2Vec
-#Counter can count the number of words/characters in a string
-from collections import Counter
 import numpy as np
-import pandas as pd
-#tqdm for loading interface
-from tqdm import tqdm
-import os,logging,pickle,random,torch,gc,deepchem,gc
-from deepchem.models.graph_models import GraphConvModel
+import os,logging,random,torch
 from deepchem.feat import graph_features
 from rdkit import Chem
 from rdkit.Chem import AllChem
@@ -21,10 +9,9 @@ from sklearn.feature_extraction.text import CountVectorizer
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
 
-
 class BaseLoader():  
-    def __init__(self, dataPath, pSeqMaxLen=1024, dSeqMaxLen=128, kmers=-1):
-        
+    def __init__(self, dataPath, pSeqMaxLen=1024, dSeqMaxLen=128, kmers=-1, seed=42):
+        np.random.seed(seed)
         #Initialize the parameters as attributes
         self.dataPath = dataPath 
         self.pSeqMaxLen = pSeqMaxLen
@@ -73,7 +60,10 @@ class BaseLoader():
         self.pContFeat = self.get_protein_kmer_features()
         
         #Complete the feature graphs for drugs
-        self.dGraphFeat = np.array([i + [[0] * 75] * (self.dSeqMaxLen - len(i)) for i in self.dFeaData], dtype=np.int8)
+        # self.dGraphFeat = np.array([i + [[0] * 75] * (self.dSeqMaxLen - len(i)) for i in self.dFeaData], dtype=np.int8)
+        # In old utils: for bindingdb they do above and for celegans/human beneath...
+        # (Beneath gives an error for human dataset but not for celegans)
+        self.dGraphFeat = np.array([i[:self.dSeqMaxLen] + [[0] * 75] * (self.dSeqMaxLen - len(i)) for i in self.dFeaData], dtype=np.int8)
         self.dFinprFeat = np.array(self.dFinData, dtype=np.float32)
         self.dSmilesData = np.array(self.dSmilesData)
         
@@ -84,15 +74,17 @@ class BaseLoader():
         self.pOnehot = self.get_onehot_proteins()
         self.pOneHot_unclipped = self.get_onehot_proteins_unclipped()
         
-        
         print("Done\n")
-        
-        
+               
     def load_data(self):
         '''Returns data in format [drug, protein, label]'''
         pass
 
     def create_proteinID(self, protein, pCnt):
+        '''
+        Checks if protein is new unique one, 
+        adds to pSeqData and assigns unique ID if this is the case
+        '''
         if protein not in self.p2id:
             self.pSeqData.append(protein)
             self.p2id[protein] = pCnt
@@ -102,6 +94,10 @@ class BaseLoader():
             return False
 
     def create_drugID(self, drug, dCnt):
+        '''
+        Checks if drug is new unique one, 
+        assigns unique ID if this is the case
+        '''
         if drug not in self.d2id:
             self.d2id[drug] = dCnt
             self.id2d.append(drug) 
@@ -110,6 +106,10 @@ class BaseLoader():
             return False
         
     def get_drug_features(self, drug):
+        '''
+        For a unique drug (input), store:
+        smiles, molecule, atomsequence, features and Morgan Fingerprint
+        '''
         self.dSmilesData.append(drug)
         mol = Chem.MolFromSmiles(drug)
         self.dMolData.append( mol )
@@ -122,7 +122,7 @@ class BaseLoader():
         
     def initialize_ID_data(self, data):
         '''
-        Give each unique protein and unique drug an ID
+        Assign IDs and create drugfeatures
         return data in format [protein_ID, drug_ID, label]
         '''
         print("\nCreating IDs...")
@@ -166,9 +166,7 @@ class BaseLoader():
                     self.id2at.append(at)
                     atCnt += 1
         return atCnt 
-
-        
-        
+     
     def tokenize_proteins(self):
         '''
         Given protein sequences as strings of characters referring to amino acids, the method
@@ -183,7 +181,6 @@ class BaseLoader():
             pSeqLen.append(min(len(pSeq), self.pSeqMaxLen))
             pSeqTokenized.append(pSeq[:self.pSeqMaxLen] + [1] * max(self.pSeqMaxLen - len(pSeq), 0))
         return pSeqTokenized, pSeqLen 
-    
     
     def tokenize_drugs(self):
         '''
@@ -218,8 +215,11 @@ class BaseLoader():
         pContFeat = (pContFeat - pContFeat.mean(axis=0)) /                     (pContFeat.std(axis=0) + 1e-8)
         return pContFeat    
     
-    # Stores for each protein whether it's seen in train and TEST set
     def get_seen_proteins(self):
+        '''
+        Create boolean vector indicating for each protein
+        whether it's present in both train and test set
+        '''
         train, test = self.eSeqData['train'], self.eSeqData['test']
         pSeen = [False] * (len(self.pSeqData))
         if len(test) > 0: # Only if there is a test set
@@ -228,9 +228,6 @@ class BaseLoader():
                     pSeen[i] = True
         return np.array(pSeen, dtype=np.bool)
         
-    # Dependent on self.pSeqTokenized!
-    # >> Thus, is clipped to pSeqMaxLen, as self.pSeqTokenized is clipped
-    # >> Can make unclipped version using self.pSeqLen
     def get_onehot_proteins(self):
         '''
         Create one-hot encoded proteins.
@@ -265,7 +262,6 @@ class BaseLoader():
             pList.append(pOneHot)
         return np.array(pList, dtype = np.object)
        
-    
     def one_epoch_batch_data_stream(self, batchSize=32, type='valid', device=torch.device('cpu')):
         edges = self.eSeqData[type]
         indexes = np.arange(len(edges))
@@ -290,8 +286,7 @@ class BaseLoader():
                       "dSmilesData":self.dSmilesData[dTokenizedNames]
                   }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
             
-    def random_batch_data_stream(self, batchSize=32, type='train', device=torch.device('cpu'),
-                                 log=False):
+    def random_batch_data_stream(self, batchSize=32, type='train', device=torch.device('cpu')):
         edges = [i for i in self.eSeqData[type]]
         while True:
             random.shuffle(edges)
@@ -316,7 +311,6 @@ class BaseLoader():
                       }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
  
  
-
 
 class LoadBindingDB(BaseLoader):
     def load_data(self, dataPath):
@@ -378,8 +372,7 @@ class LoadBindingDB(BaseLoader):
         return proteinID, proteinSequence, aminoacidID, drugID, drugSMILES        
 
 
-
-class LoadCelegans(BaseLoader):
+class LoadCelegansHuman(BaseLoader):
     def load_data(self, data_path, valid_size=0.1, test_size=0.1):
         '''
         Read file and return data as list of [drug, protein, label]
@@ -397,7 +390,7 @@ class LoadCelegans(BaseLoader):
         return data
 
     def create_sets(self, temp, valid_size, test_size):
-        random.shuffle(temp)
+        np.random.shuffle(temp)
         data = {'train': [], 'valid': [], 'test': []}
         samples = len(temp)
         split1 = int((1-valid_size-test_size)*samples)
@@ -407,38 +400,3 @@ class LoadCelegans(BaseLoader):
         data['test'] = temp[split2:]
         return data
 
-
-'''
-dataPath = "data/bindingdb"
-pSeqMaxLen=1024
-dSeqMaxLen=128
-kmers=-1
-data = LoadBindingDB(dataPath = dataPath)
-
-# ctr = CountVectorizer(ngram_range=(1, 3), analyzer='char')
-# pContFeat = ctr.fit_transform([i for i in data.pSeqData]).toarray().astype('float32')
-
-s=data.one_epoch_batch_data_stream()
-
-a = next(s)
-
-print(data.eSeqData['train'].shape)
-print(data.eSeqData['valid'].shape)
-print(data.eSeqData['test'].shape)
-print(a)
-
-dataPath = "data/celegens"
-pSeqMaxLen=1024
-dSeqMaxLen=128
-kmers=-1
-data = LoadCelegans(dataPath = dataPath)
-
-s=data.one_epoch_batch_data_stream()
-
-a = next(s)
-
-print(data.eSeqData['train'].shape)
-print(data.eSeqData['valid'].shape)
-print(data.eSeqData['test'].shape)
-print(a)
-'''

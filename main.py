@@ -9,20 +9,18 @@ from time import time
 # Own imports
 from pathlib import Path
 
-dataset = 'bindingdb' # celegans / human / bindingdb
+dataset = 'celegans' # celegans / human / bindingdb
 
 if dataset=='celegans':
-    model_path = Path("results/celegans_cv1_993.pkl")
+    model_path = Path("TEST_celegans_996.pkl")
     data_path = Path("data/celegans/data.txt")
     data_class = DataClass_normal(dataPath=data_path)
-
 elif dataset=='human':
-    model_path = Path("results/human_cv1_985.pkl")
+    model_path = Path("TEST_human_991.pkl")
     data_path = Path("data/human/data.txt")
     data_class = DataClass_normal(dataPath=data_path)
-
 else: #bindingdb
-    model_path = Path("../results/new_utils_test_bindingdb_962.pkl")
+    model_path = Path("TEST_bindingdb_962.pkl")
     data_path = Path("data/bindingdb")
     data_class = DataClass(dataPath=data_path)
 
@@ -57,27 +55,17 @@ def get_metrics(database):
         n_seen, n_unseen, seen_correct, unseen_correct = seen_stats(valid, seenbool, Y_heavi, Y)
         print("\nNumber of SEEN proteins in validation set:", n_seen)
         print("Number of UNSEEN proteins in validation set:", n_unseen)
-        print("\nAccuracy on SEEN proteins in validation set:", seen_correct/n_seen)
+        print("Accuracy on SEEN proteins in validation set:", seen_correct/n_seen)
         print("Accuracy on UNSEEN proteins in validation set:", unseen_correct/n_unseen)
         print("\nAccuracy and AUC on total validation set:")
     else: # bindingdb
         test = np.array(data_class.eSeqData['test'])
-        print("TEST1:",test[0])
-        print("TEST2:",test[1])
-        print("TEST3:",test[2])
-        
-        ones = 0
-        for i in range(len(test)):
-            if test[i,2]==1:
-                ones += 1
-        print("NUMBER OF 1 LABELS:", ones)
-    
         Ypre, Y, seenbool = model.calculate_y_with_seenbool(data_class.one_epoch_batch_data_stream(batchSize=128, type='test', device=torch.device('cuda')))
         Y_heavi = np.where(Ypre>=0.5, 1, 0)
         n_seen, n_unseen, seen_correct, unseen_correct = seen_stats(test, seenbool, Y_heavi, Y)
         print("\nNumber of SEEN proteins in test set:", n_seen)
         print("Number of UNSEEN proteins in test set:", n_unseen)
-        print("\nAccuracy on SEEN proteins in test set:", seen_correct/n_seen)
+        print("Accuracy on SEEN proteins in test set:", seen_correct/n_seen)
         print("Accuracy on UNSEEN proteins in test set:", unseen_correct/n_unseen)
         print("\nAccuracy and AUC on total test set:")
     
@@ -90,3 +78,16 @@ print("\nNumber of training examples:", data_class.trainSampleNum)
 print("Number of valid examples:", data_class.validSampleNum)
 print("Number of test examples:", data_class.testSampleNum)
 get_metrics(dataset)
+
+''' To test whether there are differences between new_utils test set and utils test set: NO DIFFERENCE
+dif = 0
+nodif = 0
+a = np.array(([[1,2,3],[2,3,4],[3,4,5]]))
+b = np.array(([[1,1,1],[2,2,2],[1,2,3]]))
+for i in range(len(a)):
+    if not(np.any(a[i]==b)):
+        dif += 1
+    else:
+        nodif += 1
+print(dif)
+'''

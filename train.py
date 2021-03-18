@@ -1,20 +1,21 @@
 # Initialize connection with rest of lib
 from new_utils import *
 from DL_ClassifierModel import *
-
-# Own imports
+import os
 from pathlib import Path
 
-data_path = Path("data/bindingdb")
-# data_path = Path("data/bindingdb")
+# Choose dataset and modelfile name
+data = "bindingdb"
+save_path = "TEST_bindingdb"
+
+data_path = Path(os.path.join("data", data))
 assert data_path.exists(), "Download the necessary data from the following link: " \
                            "https://raw.githubusercontent.com/masashitsubaki/CPI_prediction/master/dataset/celegans/original/data.txt"
 
-# For celegans/human
-# data_class = LoadCelegans(dataPath=data_path)
-
-# For bindingdb
-data_class = LoadBindingDB(dataPath=data_path)
+if data=="celegans" or data=="human":
+    data_class = LoadCelegansHuman(dataPath=data_path)
+else: #bindingdb
+    data_class = LoadBindingDB(dataPath=data_path)
 
 model = DTI_Bridge(outSize=128,
                   cHiddenSizeList=[1024],
@@ -23,14 +24,13 @@ model = DTI_Bridge(outSize=128,
                   gcnHiddenSizeList=[128, 128], fcHiddenSizeList=[128], nodeNum=64,
                   hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'))
 
-
 model.train(data_class, trainSize=512, batchSize=512, epoch=128,
             stopRounds=-1, earlyStop=30,
-            savePath='new_utils_test_bindingdb', metrics="AUC", report=["ACC", "AUC", "LOSS"],
-            preheat=0)  # Used to have learning rate (lr=0.001) as param ???
+            savePath=save_path, metrics="AUC", report=["ACC", "AUC", "LOSS"],
+            preheat=0)
 '''
 model.cv_train(data_class, trainSize=512, batchSize=512, epoch=128,
             stopRounds=-1, earlyStop=30,
-            savePath='human', metrics="AUC", report=["ACC", "AUC", "LOSS"],
-            preheat=0)  # Used to have learning rate (lr=0.001) as param ???
+            savePath=save_path, metrics="AUC", report=["ACC", "AUC", "LOSS"],
+            preheat=0)
 '''
