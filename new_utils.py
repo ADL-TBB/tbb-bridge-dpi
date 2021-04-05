@@ -1,4 +1,5 @@
 import numpy as np
+import sys
 import os,logging,random,torch
 from deepchem.feat import graph_features
 from rdkit import Chem
@@ -6,6 +7,10 @@ from rdkit.Chem import AllChem
 from rdkit import DataStructs
 #Transform strings into vectors of elements and onehot encode their presence/absence in a certain string
 from sklearn.feature_extraction.text import CountVectorizer
+sys.path.insert(0, 'smiles_transformer')
+
+from smiles_transformer.pretrain_trfm import TrfmSeq2seq
+from smiles_transformer.build_vocab import WordVocab
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
 
@@ -66,6 +71,9 @@ class BaseLoader():
         self.dGraphFeat = np.array([i[:self.dSeqMaxLen] + [[0] * 75] * (self.dSeqMaxLen - len(i)) for i in self.dFeaData], dtype=np.int8)
         self.dFinprFeat = np.array(self.dFinData, dtype=np.float32)
         self.dSmilesData = np.array(self.dSmilesData)
+
+        self.vocab = WordVocab.load_vocab('data/smiles_trfm_model/vocab.pkl')
+        self.ST_fingerprint = np.array(self.get_ST_features(), dtype=np.int32)
         
         #Get the boolean vector of seen and unseen proteins
         self.pSeen = self.get_seen_proteins()
@@ -197,6 +205,55 @@ class BaseLoader():
             dSeqTokenized.append(
                 atoms[:self.dSeqMaxLen] + [1] * max(self.dSeqMaxLen - len(atoms), 0))
         return dSeqTokenized, dSeqLen
+
+    def load_pretrained_smiles_trfm(self):
+        """
+        Load the pretrained SMILES Transformer model with pickle
+        :return: SMILES transformer object
+        """
+        trfm = TrfmSeq2seq(len(self.vocab), 256, len(self.vocab), 4)
+        trfm.load_state_dict(torch.load('data/smiles_trfm_model/trfm_12_23000.pkl'))
+        return trfm
+
+    def tokenize_smiles(self):
+        """
+        Tokenize SMILES as preprocesing for SMILES transfromer fingerprints
+        :return: tensor with tokenized SMILES
+        """
+        pad_index = 0
+        unk_index = 1
+        eos_index = 2
+        sos_index = 3
+        seq_len = 220
+
+        x_id, x_seg = [], []
+        for sm in self.id2d:
+            sm = sm.split()
+            if len(sm) > 218:
+                print('SMILES is too long ({:d})'.format(len(sm)))
+                sm = sm[:109] + sm[-109:]
+            ids = [self.vocab.stoi.get(token, unk_index) for token in sm]
+            ids = [sos_index] + ids + [eos_index]
+            padding = [pad_index] * (seq_len - len(ids))
+            ids.extend(padding)
+            x_id.append(ids)
+
+        return torch.tensor(x_id)
+
+    def get_ST_features(self):
+        """
+        Get Fingerprints from pretrained SMILES Transformer
+        :return: fingerprints
+        """
+        tokenized = self.tokenize_smiles()
+        trfm = self.load_pretrained_smiles_trfm()
+        fingerprints = trfm.encode(torch.t(tokenized))
+
+        ST_fingerprints = []
+        for drug_prot in self.eSeqData:  # iterate all lines of drug/protein,
+            smiles_index = drug_prot[1]  # use unique drug index in eSeqData to map the embeddings to the array
+            ST_fingerprints.append(fingerprints[smiles_index])
+        return ST_fingerprints
     
     def get_protein_kmer_features(self):
         '''
@@ -283,7 +340,8 @@ class BaseLoader():
                       "seenbool": torch.tensor(self.pSeen[pTokenizedNames], dtype=torch.bool).to(device),
                       "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.int8).to(device),
                       "pOnehot_unclipped":self.pOneHot_unclipped[pTokenizedNames],
-                      "dSmilesData":self.dSmilesData[dTokenizedNames]
+                      "dSmilesData":self.dSmilesData[dTokenizedNames],
+                      "ST_fingerprint": torch.tensor(self.ST_fingerprint[pTokenizedNames], dtype=torch.float32).to(device)
                   }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
             
     def random_batch_data_stream(self, batchSize=32, type='train', device=torch.device('cpu')):
@@ -307,7 +365,9 @@ class BaseLoader():
                           "seenbool": torch.tensor(self.pSeen[pTokenizedNames], dtype=torch.bool).to(device),
                           "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.int8).to(device),
                           "pOnehot_unclipped":self.pOneHot_unclipped[pTokenizedNames],
-                          "dSmilesData":self.dSmilesData[dTokenizedNames]
+                          "dSmilesData":self.dSmilesData[dTokenizedNames],
+                          "ST_fingerprint": torch.tensor(self.ST_fingerprint[pTokenizedNames], dtype=torch.float32).to(
+                              device)
                       }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
  
  
