@@ -1,9 +1,9 @@
 import numpy as np
 import sys
 import os,logging,random,torch
+from rdkit import DataStructs
 from rdkit import Chem
 from rdkit.Chem import AllChem
-from rdkit import DataStructs
 from deepchem.feat import graph_features
 
 #Transform strings into vectors of elements and onehot encode their presence/absence in a certain string
