@@ -334,6 +334,7 @@ class BaseLoader():
                       "dSeqLen": torch.tensor(self.dSeqLen[dTokenizedNames], dtype=torch.int32).to(device),
                       "seenbool": torch.tensor(self.pSeen[pTokenizedNames], dtype=torch.bool).to(device),
                       "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.int8).to(device),
+                      "pEmbeddings": torch.tensor(self.id2emb[pTokenizedNames], dtype=torch.float32).to(device),
                       "pOnehot_unclipped":self.pOneHot_unclipped[pTokenizedNames],
                       "dSmilesData":self.dSmilesData[dTokenizedNames]
                   }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
