@@ -310,7 +310,26 @@ class BaseLoader():
                           "dSmilesData":self.dSmilesData[dTokenizedNames]
                       }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
  
- 
+    def test_data_stream(self, batchSize=32, type='test', device=torch.device('cpu')):
+        edges = self.eSeqData[type]
+        for i in range((len(edges) + batchSize - 1) // batchSize):
+            samples = edges[i * batchSize:(i + 1) * batchSize]
+            pTokenizedNames, dTokenizedNames = [i[0] for i in samples], [i[1] for i in samples]
+           
+            yield {
+                      "res": True,
+                      "aminoSeq": torch.tensor(self.pSeqTokenized[pTokenizedNames], dtype=torch.long).to(device),
+                      "aminoCtr": torch.tensor(self.pContFeat[pTokenizedNames], dtype=torch.float32).to(device),
+                      "pSeqLen": torch.tensor(self.pSeqLen[pTokenizedNames], dtype=torch.int32).to(device),
+                      "atomFea": torch.tensor(self.dGraphFeat[dTokenizedNames], dtype=torch.float32).to(device),
+                      "atomFin": torch.tensor(self.dFinprFeat[dTokenizedNames], dtype=torch.float32).to(device),
+                      "atomSeq": torch.tensor(self.dSeqTokenized[dTokenizedNames], dtype=torch.long).to(device),
+                      "dSeqLen": torch.tensor(self.dSeqLen[dTokenizedNames], dtype=torch.int32).to(device),
+                      "seenbool": torch.tensor(self.pSeen[pTokenizedNames], dtype=torch.bool).to(device),
+                      "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.int8).to(device),
+                      "pOnehot_unclipped":self.pOneHot_unclipped[pTokenizedNames],
+                      "dSmilesData":self.dSmilesData[dTokenizedNames]
+                  }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
 
 class LoadBindingDB(BaseLoader):
     def load_data(self, dataPath):
@@ -371,7 +390,6 @@ class LoadBindingDB(BaseLoader):
         drugSMILES = [i.strip() for i in open(files[4], 'r').readlines()]
         return proteinID, proteinSequence, aminoacidID, drugID, drugSMILES        
 
-
 class LoadCelegansHuman(BaseLoader):
     def load_data(self, data_path, valid_size=0.1, test_size=0.1):
         '''
@@ -400,3 +418,126 @@ class LoadCelegansHuman(BaseLoader):
         data['test'] = temp[split2:]
         return data
 
+
+
+class LoadSarscov2_with_Celegans(BaseLoader):
+    def load_data(self, data_path):
+        print('\nReading the raw data...')
+
+        data = {'train': [], 'valid': [], 'test': []}
+
+        temp = []
+        file = open(os.path.join('data\\celegans', 'data.txt'), 'r')
+        for line in file.readlines():
+            if line == '':
+                break
+            drug, protein, label = line.strip().split(' ')
+            temp.append(np.array((drug, protein, int(label))))
+        file.close()
+        data['train'] = np.array(temp)
+
+        temp = []
+        file = open(os.path.join(data_path, 'data.txt'), 'r')
+        for line in file.readlines():
+            if line == '':
+                break
+            protein, drug, label = line.strip().split(' ')
+            temp.append(np.array((drug, protein, int(label))))
+        file.close()
+        data['test'] = np.array(temp)
+
+        return data
+
+class LoadSarscov2_with_Human(BaseLoader):
+    def load_data(self, data_path):
+        print('\nReading the raw data...')
+
+        data = {'train': [], 'valid': [], 'test': []}
+
+        temp = []
+        file = open(os.path.join('data\\human', 'data.txt'), 'r')
+        for line in file.readlines():
+            if line == '':
+                break
+            drug, protein, label = line.strip().split(' ')
+            temp.append(np.array((drug, protein, int(label))))
+        file.close()
+        data['train'] = np.array(temp)
+
+        temp = []
+        file = open(os.path.join(data_path, 'data.txt'), 'r')
+        for line in file.readlines():
+            if line == '':
+                break
+            protein, drug, label = line.strip().split(' ')
+            temp.append(np.array((drug, protein, int(label))))
+        file.close()
+        data['test'] = np.array(temp)
+
+        return data
+
+class LoadSarscov2_with_BindingDB(BaseLoader):
+    def load_data(self, data_path):
+        print('\nReading the raw data...')
+
+        data = {'train': [], 'valid': [], 'test': []}
+
+        for folder in ['train', 'dev', 'test']:
+            print("\tOpened "+folder)
+            path = os.path.join("data\\bindingdb", folder)
+            proteinID, proteinSequence, aminoacidID, drugID, drugSMILES = self.get_info(path)
+
+            for type in ['edges.pos', 'edges.neg']:
+                print("\tReading "+type)
+                file = open(os.path.join(path, type), 'r')
+                for line in file.readlines():
+                    chem, dID, protein, pID = line.strip().split(',')
+
+                    pIndex = proteinID.index(pID) # Get index of protein ID
+                    aminoacids = proteinSequence[pIndex].split() # Get corresponding sequence of amino acid IDs
+                    protein = ''
+                    # Transform amino acid IDs to letters
+                    for i in range(len(aminoacids)):
+                        id = int(aminoacids[i])
+                        protein += aminoacidID[id]
+                    dIndex = drugID.index(dID)
+                    drug = drugSMILES[dIndex]
+
+                    if type == 'edges.neg':
+                        label = '0'
+                    else:
+                        label = '1'
+                    data['train'].append(np.array((drug, protein, int(label))))
+                file.close()
+        
+        temp = []
+        file = open(os.path.join(data_path, 'data.txt'), 'r')
+        for line in file.readlines():
+            if line == '':
+                break
+            protein, drug, label = line.strip().split(' ')
+            temp.append(np.array((drug, protein, int(label))))
+        file.close()
+        data['test'] = np.array(temp)
+
+        return data
+
+    def get_info(self, data_path):
+        # protein: protein IDs (e.g. A4D1B5)
+        # protein.repr: amino acid ID sequence of each protein
+        # protein.vocab: the different amino acids
+        # chem: drug IDs (e.g. 89659229)
+        # chem.repr: SMILES
+        # edges.pos: ['chem', drugID, 'protein', proteinID]
+        # edges.neg: ^
+        files = [os.path.join(data_path, 'protein'), 
+                os.path.join(data_path, 'protein.repr'),
+                os.path.join(data_path, 'protein.vocab'),
+                os.path.join(data_path, 'chem'),
+                os.path.join(data_path, 'chem.repr')]
+        proteinID = [i.strip() for i in open(files[0], 'r').readlines()]
+        proteinSequence = [i.strip() for i in open(files[1], 'r').readlines()]
+        aminoacidID = [i.strip() for i in open(files[2], 'r').readlines()]
+        drugID = [i.strip() for i in open(files[3], 'r').readlines()]
+        drugSMILES = [i.strip() for i in open(files[4], 'r').readlines()]
+        return proteinID, proteinSequence, aminoacidID, drugID, drugSMILES
