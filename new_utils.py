@@ -4,6 +4,8 @@ from deepchem.feat import graph_features
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit import DataStructs
+from pathlib import Path
+import pickle as pkl
 #Transform strings into vectors of elements and onehot encode their presence/absence in a certain string
 from sklearn.feature_extraction.text import CountVectorizer
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
@@ -31,6 +33,9 @@ class BaseLoader():
         #Protein and drug data and their labels 
         self.eSeqData,self.edgeLab = {},{}
         self.initialize_ID_data(self.data)
+
+        #Create ELMO protein embeddings
+        self.id2emb = torch.stack(self.create_embeddings())
         
         #Initialize and assign each amino acid to a specific numerical id
         self.am2id, self.id2am = {"<UNK>": 0, "<EOS>": 1}, ["<UNK>", "<EOS>"]
@@ -281,6 +286,7 @@ class BaseLoader():
                       "atomSeq": torch.tensor(self.dSeqTokenized[dTokenizedNames], dtype=torch.long).to(device),
                       "dSeqLen": torch.tensor(self.dSeqLen[dTokenizedNames], dtype=torch.int32).to(device),
                       "seenbool": torch.tensor(self.pSeen[pTokenizedNames], dtype=torch.bool).to(device),
+                      "pEmbeddings": torch.tensor(self.id2emb[pTokenizedNames], dtype=torch.float32).to(device),
                       "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.int8).to(device),
                       "pOnehot_unclipped":self.pOneHot_unclipped[pTokenizedNames],
                       "dSmilesData":self.dSmilesData[dTokenizedNames]
@@ -306,6 +312,7 @@ class BaseLoader():
                           "dSeqLen": torch.tensor(self.dSeqLen[dTokenizedNames], dtype=torch.int32).to(device),
                           "seenbool": torch.tensor(self.pSeen[pTokenizedNames], dtype=torch.bool).to(device),
                           "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.int8).to(device),
+                          "pEmbeddings": torch.tensor(self.id2emb[pTokenizedNames], dtype=torch.float32).to(device),
                           "pOnehot_unclipped":self.pOneHot_unclipped[pTokenizedNames],
                           "dSmilesData":self.dSmilesData[dTokenizedNames]
                       }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
@@ -388,7 +395,22 @@ class LoadBindingDB(BaseLoader):
         aminoacidID = [i.strip() for i in open(files[2], 'r').readlines()]
         drugID = [i.strip() for i in open(files[3], 'r').readlines()]
         drugSMILES = [i.strip() for i in open(files[4], 'r').readlines()]
-        return proteinID, proteinSequence, aminoacidID, drugID, drugSMILES        
+        return proteinID, proteinSequence, aminoacidID, drugID, drugSMILES   
+
+    def create_embeddings(self):
+        '''
+        For all the proteins of the dataset, obtain the ELMO embeddings
+        for the sequences
+        '''
+        data = 'data'
+        path = os.path.join(data, 'embedding_files','prot_embedding_bindingDB.pkl')
+        emb_file = open(path, 'rb')
+        emb_dict = pkl.load(emb_file)
+        emb_file.close()
+        id2emb = []
+        for protein in self.p2id.keys():
+            id2emb.append(emb_dict[protein])
+        return id2emb     
 
 class LoadCelegansHuman(BaseLoader):
     def load_data(self, data_path, valid_size=0.1, test_size=0.1):
@@ -417,6 +439,23 @@ class LoadCelegansHuman(BaseLoader):
         data['valid'] = temp[split1:split2]
         data['test'] = temp[split2:]
         return data
+    
+    def create_embeddings(self):
+        '''
+        Import the ELMO protein embeddings for either human of c.elegans dataset
+        '''
+        data = 'data'
+        if 'human' in str(self.dataPath):
+            path = os.path.join(data, 'embedding_files','prot_embedding_human.pkl')
+        else:
+            path = os.path.join(data, 'embedding_files','prot_embedding_celegans.pkl')
+        emb_file = open(path, 'rb')
+        emb_dict = pkl.load(emb_file)
+        emb_file.close()
+        id2emb = []
+        for protein in self.p2id.keys():
+            id2emb.append(emb_dict[protein])
+        return id2emb
 
 
 
@@ -541,3 +580,4 @@ class LoadSarscov2_with_BindingDB(BaseLoader):
         drugID = [i.strip() for i in open(files[3], 'r').readlines()]
         drugSMILES = [i.strip() for i in open(files[4], 'r').readlines()]
         return proteinID, proteinSequence, aminoacidID, drugID, drugSMILES
+
