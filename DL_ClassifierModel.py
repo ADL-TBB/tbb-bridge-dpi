@@ -440,3 +440,94 @@ class DTI_Bridge(BaseClassifier):
         # , "loss":1*l2}
         return {"y_logit": self.fcLinear(node_embed).squeeze(dim=1)}
 
+
+class ST_Bridge(BaseClassifier):
+    def __init__(self, outSize,
+                 cHiddenSizeList,
+                 fHiddenSizeList,
+                 fSize=1024, cSize=8422,
+                 gcnHiddenSizeList=[], fcHiddenSizeList=[], nodeNum=32, resnet=True,
+                 hdnDropout=0.1, fcDropout=0.2, device=torch.device('cuda'), sampleType='CEL',
+                 useFeatures={"kmers": True, "pSeq": True,
+                              "FP": True, "dSeq": True},
+                 maskDTI=False):
+        self.nodeEmbedding = TextEmbedding(torch.tensor(np.random.normal(size=(max(
+            nodeNum, 0), outSize)), dtype=torch.float32), dropout=hdnDropout, name='nodeEmbedding').to(device)
+
+        self.amEmbedding = TextEmbedding(
+            torch.eye(24), dropout=hdnDropout, freeze=True, name='amEmbedding').to(device)
+        self.pCNN = TextCNN(24, 64, [25], ln=True, name='pCNN').to(device)
+        self.pFcLinear = MLP(64, outSize, dropout=hdnDropout, bnEveryLayer=True,
+                             dpEveryLayer=True, outBn=True, outAct=True, outDp=True, name='pFcLinear').to(device)
+
+        self.dCNN = TextCNN(75, 64, [7], ln=True, name='dCNN').to(device)
+
+        self.STLinear = MLP(fSize, outSize, fHiddenSizeList, outAct=True, name='fFcLinear',
+                              dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
+             device) # altered MLP layer for SMILES transformer
+
+        self.cFcLinear = MLP(cSize, outSize, cHiddenSizeList, outAct=True, name='cFcLinear',
+                             dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
+            device)
+
+        self.nodeGCN = GCN(outSize, outSize, gcnHiddenSizeList, name='nodeGCN', dropout=hdnDropout,
+                           dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True, resnet=resnet).to(device)
+
+        self.fcLinear = MLP(outSize, 1, fcHiddenSizeList, dropout=fcDropout,
+                            bnEveryLayer=True, dpEveryLayer=True).to(device)
+
+        self.criterion = nn.BCEWithLogitsLoss()
+
+        self.embModuleList = nn.ModuleList([])
+        self.finetunedEmbList = nn.ModuleList([])
+        self.moduleList = nn.ModuleList(
+            [self.nodeEmbedding, self.cFcLinear, self.STLinear, self.nodeGCN, self.fcLinear,
+             self.amEmbedding, self.pCNN, self.pFcLinear, self.dCNN])
+        self.sampleType = sampleType
+        self.device = device
+        self.resnet = resnet
+        self.nodeNum = nodeNum
+        self.hdnDropout = hdnDropout
+        self.useFeatures = useFeatures
+        self.maskDTI = maskDTI
+
+    def calculate_y_logit(self, X, mode='train'):
+        Xam = (self.cFcLinear(X['aminoCtr']).unsqueeze(1) if self.useFeatures['kmers'] else 0) + \
+              (self.pFcLinear(self.pCNN(self.amEmbedding(X['aminoSeq']))).unsqueeze(
+                  1) if self.useFeatures['pSeq'] else 0)  # => batchSize × 1 × outSize
+        Xat = self.STLinear(X['ST_fingerprint']).unsqueeze(1)  # changed to fit the transformer fingerprint MLP
+
+        if self.nodeNum > 0:
+            node = self.nodeEmbedding.dropout2(self.nodeEmbedding.dropout1(
+                self.nodeEmbedding.embedding.weight)).repeat(len(Xat), 1, 1)
+            # => batchSize × nodeNum × outSize
+            node = torch.cat([Xam, Xat, node], dim=1)
+            # => batchSize × nodeNum × 1
+            nodeDist = torch.sqrt(torch.sum(node ** 2, dim=2, keepdim=True) + 1e-8)
+
+            cosNode = torch.matmul(node, node.transpose(
+                1, 2)) / (nodeDist * nodeDist.transpose(1, 2) + 1e-8)  # => batchSize × nodeNum × nodeNum
+            # cosNode = cosNode*0.5 + 0.5
+            cosNode = F.relu(cosNode)  # => batchSize × nodeNum × nodeNum
+            # => batchSize × nodeNum × nodeNum
+            cosNode[:, range(node.shape[1]), range(node.shape[1])] = 1
+            if self.maskDTI:
+                cosNode[:, 0, 1] = cosNode[:, 1, 0] = 0
+            D = torch.eye(node.shape[1], dtype=torch.float32, device=self.device).repeat(
+                len(Xam), 1, 1)  # => batchSize × nodeNum × nodeNum
+            D[:, range(node.shape[1]), range(node.shape[1])] = 1 / \
+                                                               (torch.sum(cosNode, dim=2) ** 0.5)
+            # => batchSize × batchnodeNum × nodeNumSize
+            pL = torch.matmul(torch.matmul(D, cosNode), D)
+            # => batchSize × nodeNum × outSize
+            node_gcned = self.nodeGCN(node, pL)
+
+            node_embed = node_gcned[:, 0, :] * \
+                         node_gcned[:, 1, :]  # => batchSize × outSize
+        else:
+            node_embed = (Xam * Xat).squeeze(dim=1)  # => batchSize × outSize
+        # if self.resnet:
+        #    node_gcned += torch.cat([Xam[:,0,:],Xat[:,0,:]],dim=1)
+        # , "loss":1*l2}
+        return {"y_logit": self.fcLinear(node_embed).squeeze(dim=1)}
+
