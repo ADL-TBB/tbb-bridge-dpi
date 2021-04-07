@@ -77,7 +77,7 @@ class BaseLoader():
         self.dSmilesData = np.array(self.dSmilesData)
 
         self.vocab = WordVocab.load_vocab('data/smiles_trfm_model/vocab.pkl')
-        self.ST_fingerprint = np.array(self.get_ST_features(), dtype=np.int32)
+        self.ST_fingerprint = self.get_ST_features()
 
         # Get the boolean vector of seen and unseen proteins
         self.pSeen = self.get_seen_proteins()
