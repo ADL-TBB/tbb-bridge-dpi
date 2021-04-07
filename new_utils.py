@@ -255,6 +255,7 @@ class BaseLoader():
 
         print(self.id2d[:20])
         print(dict(list(self.d2id.items())[0:20]))
+        print(self.eSeqData[:20])
         exit()
         ST_fingerprints = []
         for drug_prot in self.eSeqData:  # iterate all lines of drug/protein,
