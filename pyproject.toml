@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "tbb-bridge-dpi"
+version = "0.1.0"
+description = "Repo for our altered code for Bridge DPI for the ADL course @ Leiden University (2020-2021)"
+authors = ["Alessandro Palma <>",
+           "Heleen Severin <>",
+           "Julius Cathalina <julius.cathalina@gmail.com>",
+           "Laurens Engwegen <>",
+           "Stijn Oudshoorn <>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.9"
+scipy = "^1.6.1"
+tqdm = "^4.58.0"
+tables = "^3.6.1"
+tensorflow = "^2.4.1"
+scikit-learn = "^0.24.1"
+torch = {version = "^1.7.1", python = "^3.8"}
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
