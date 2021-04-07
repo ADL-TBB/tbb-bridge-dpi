@@ -481,7 +481,7 @@ class ST_Bridge(BaseClassifier):
         self.embModuleList = nn.ModuleList([])
         self.finetunedEmbList = nn.ModuleList([])
         self.moduleList = nn.ModuleList(
-            [self.nodeEmbedding, self.cFcLinear, self.nodeGCN, self.fcLinear,
+            [self.nodeEmbedding, self.cFcLinear, self.STLinear, self.nodeGCN, self.fcLinear,
              self.amEmbedding, self.pCNN, self.pFcLinear, self.dCNN])
         self.sampleType = sampleType
         self.device = device
