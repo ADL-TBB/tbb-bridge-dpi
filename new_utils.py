@@ -376,7 +376,7 @@ class BaseLoader():
                               device)
                       }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
  
-    def test_data_stream(self, batchSize=32, type='test', device=torch.device('cpu')):
+    def unshuffled_data_stream(self, batchSize=32, type='test', device=torch.device('cpu')):
         edges = self.eSeqData[type]
         for i in range((len(edges) + batchSize - 1) // batchSize):
             samples = edges[i * batchSize:(i + 1) * batchSize]
