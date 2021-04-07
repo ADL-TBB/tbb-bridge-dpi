@@ -213,13 +213,13 @@ class BaseLoader():
     def load_pretrained_smiles_trfm(self):
         """
         Load the pretrained SMILES Transformer model with pickle
-        :return: SMILES transformer object
+        :return: SMILES transformer model
         """
         trfm = TrfmSeq2seq(len(self.vocab), 256, len(self.vocab), 4)
         trfm.load_state_dict(torch.load('data/smiles_trfm_model/trfm_12_23000.pkl'))
         return trfm
 
-    def tokenize_smiles(self):
+    def tokenize_smiles(self, smiles):
         """
         Tokenize SMILES as preprocesing for SMILES transfromer fingerprints
         :return: tensor with tokenized SMILES
@@ -231,7 +231,7 @@ class BaseLoader():
         seq_len = 220
 
         x_id, x_seg = [], []
-        for sm in self.id2d:
+        for sm in smiles:
             sm = sm.split()
             if len(sm) > 218:
                 print('SMILES is too long ({:d})'.format(len(sm)))
@@ -247,20 +247,12 @@ class BaseLoader():
     def get_ST_features(self):
         """
         Get Fingerprints from pretrained SMILES Transformer
-        :return: fingerprints
+        :return: SMILES transformer fingerprints
         """
-        tokenized = self.tokenize_smiles()
+        tokenized = self.tokenize_smiles(self.id2d)
         trfm = self.load_pretrained_smiles_trfm()
-        fingerprints = trfm.encode(torch.t(tokenized))
+        ST_fingerprints = trfm.encode(torch.t(tokenized))
 
-        print(self.id2d[:20])
-        print(dict(list(self.d2id.items())[0:20]))
-        print(self.eSeqData[:20])
-        exit()
-        ST_fingerprints = []
-        for drug_prot in self.eSeqData:  # iterate all lines of drug/protein,
-            smiles_index = drug_prot[1]  # use unique drug index in eSeqData to map the embeddings to the array
-            ST_fingerprints.append(fingerprints[smiles_index])
         return ST_fingerprints
 
     def get_protein_kmer_features(self):
