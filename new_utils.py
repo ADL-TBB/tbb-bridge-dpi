@@ -17,8 +17,9 @@ logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=lo
 
 
 class BaseLoader():
-    def __init__(self, dataPath, pSeqMaxLen=1024, dSeqMaxLen=128, kmers=-1, seed=42):
+    def __init__(self, dataPath, device='cuda', pSeqMaxLen=1024, dSeqMaxLen=128, kmers=-1, seed=42):
         np.random.seed(seed)
+        self.device = device
         # Initialize the parameters as attributes
         self.dataPath = dataPath
         self.pSeqMaxLen = pSeqMaxLen
@@ -218,7 +219,7 @@ class BaseLoader():
         :return: SMILES transformer model
         """
         trfm = TrfmSeq2seq(len(self.vocab), 256, len(self.vocab), 4)
-        trfm.load_state_dict(torch.load('data/smiles_trfm_model/trfm_12_23000.pkl'))
+        trfm.load_state_dict(torch.load('data/smiles_trfm_model/trfm_12_23000.pkl', map_location=self.device))
         return trfm
 
     def tokenize_smiles(self, smiles):
@@ -345,7 +346,7 @@ class BaseLoader():
                       "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.int8).to(device),
                       "pOnehot_unclipped": self.pOneHot_unclipped[pTokenizedNames],
                       "dSmilesData": self.dSmilesData[dTokenizedNames],
-                      "ST_fingerprint": torch.tensor(self.ST_fingerprint[pTokenizedNames], dtype=torch.float32).to(
+                      "ST_fingerprint": torch.tensor(self.ST_fingerprint[dTokenizedNames], dtype=torch.float32).to(
                           device)
                   }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
 
@@ -372,7 +373,7 @@ class BaseLoader():
                           "pEmbeddings": torch.tensor(self.id2emb[pTokenizedNames], dtype=torch.float32).to(device),
                           "pOnehot_unclipped":self.pOneHot_unclipped[pTokenizedNames],
                           "dSmilesData":self.dSmilesData[dTokenizedNames],
-                          "ST_fingerprint": torch.tensor(self.ST_fingerprint[pTokenizedNames], dtype=torch.float32).to(
+                          "ST_fingerprint": torch.tensor(self.ST_fingerprint[dTokenizedNames], dtype=torch.float32).to(
                               device)
                       }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
  
@@ -394,8 +395,10 @@ class BaseLoader():
                       "seenbool": torch.tensor(self.pSeen[pTokenizedNames], dtype=torch.bool).to(device),
                       "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.int8).to(device),
                       "pEmbeddings": torch.tensor(self.id2emb[pTokenizedNames], dtype=torch.float32).to(device),
-                      "pOnehot_unclipped":self.pOneHot_unclipped[pTokenizedNames],
-                      "dSmilesData":self.dSmilesData[dTokenizedNames]
+                      "pOnehot_unclipped": self.pOneHot_unclipped[pTokenizedNames],
+                      "dSmilesData": self.dSmilesData[dTokenizedNames],
+                      "ST_fingerprint": torch.tensor(self.ST_fingerprint[dTokenizedNames], dtype=torch.float32).to(
+                          device)
                   }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
 
 
