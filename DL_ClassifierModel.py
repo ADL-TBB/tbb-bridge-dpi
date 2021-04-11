@@ -289,15 +289,14 @@ class BaseClassifier:
 
     def calculate_y_prob_by_iterator(self, dataStream):
         YArr, Y_preArr = [], []
-        while True:
-            try:
-                X, Y = next(dataStream)
-            except:
-                break
+        for minibatch in dataStream:
+            X, Y = minibatch
+
             Y_pre, Y = self.calculate_y_prob(
                 X, mode='predict').cpu().data.numpy(), Y.cpu().data.numpy()
             YArr.append(Y)
             Y_preArr.append(Y_pre)
+
         YArr, Y_preArr = np.hstack(YArr).astype(
             'int32'), np.hstack(Y_preArr).astype('float32')
         return Y_preArr, YArr
@@ -305,18 +304,14 @@ class BaseClassifier:
     # New function to calculate scores for seen/unseen proteins separately
     def calculate_y_with_seenbool(self, dataStream):
         YArr, Y_preArr, seenbool = [], [], []
+        for minibatch in dataStream:
+            X, Y = minibatch
 
-        while True:
-            try:
-                X, Y = next(dataStream)
-            except:
-                break
             Y_pre, Y = self.calculate_y_prob(X, mode='predict').cpu().data.numpy(), Y.cpu().data.numpy()
-            
             seenbool.append(X['seenbool'].cpu())
-
             YArr.append(Y)
             Y_preArr.append(Y_pre)
+
         YArr, Y_preArr, seenbool = np.hstack(YArr).astype('int32'), np.hstack(Y_preArr).astype('float32'), np.hstack(seenbool).astype(bool)
         return Y_preArr, YArr, seenbool
 
