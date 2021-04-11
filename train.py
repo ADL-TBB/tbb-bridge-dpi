@@ -1,5 +1,5 @@
 # Initialize connection with rest of lib
-from new_utils import *
+from utils import *
 from DL_ClassifierModel import *
 import os
 from pathlib import Path
