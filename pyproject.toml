@@ -11,17 +11,22 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.7"
+python = ">=3.7, <4.0"
 scipy = "^1.6.1"
 tqdm = "^4.58.0"
 tables = "^3.6.1"
-tensorflow = "^2.4.1"
+tensorflow = "^2.3"
 scikit-learn = "^0.24.1"
-torch = {version = "^1.7.1", python = "^3.7"}
+torch = {version = "^1.8.1", python = "^3.7"}
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.2"
+poethepoet = "^0.10.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poe.tasks]
+torch-cuda-win = "pip install torch==1.8.1+cu102 torchvision==0.9.1+cu102 torchaudio===0.8.1 -f https://download.pytorch.org/whl/torch_stable.html"
+torch-cuda-linux = "pip install torch torchvision torchaudio"
