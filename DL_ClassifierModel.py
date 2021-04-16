@@ -457,7 +457,7 @@ class ST_Bridge(BaseClassifier):
 
         self.dCNN = TextCNN(75, 64, [7], ln=True, name='dCNN').to(device)
 
-        self.STLinear = MLP(fSize, outSize, fHiddenSizeList, outAct=True, name='fFcLinear',
+        self.STLinear = MLP(fSize, outSize, fHiddenSizeList, outAct=True, name='STLinear',
                               dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
              device) # altered MLP layer for SMILES transformer
 
