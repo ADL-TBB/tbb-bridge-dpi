@@ -13,6 +13,7 @@ This repo houses an academic project for the seminar course at Leiden University
 - Make sure you have conda installed on your machine. You can download it [here](https://conda.io/projects/conda/en/latest/user-guide/install/index.html)
 - Install the conda environment by running `conda env create -f env.yml`
 - Install the rest of the packages by running `poetry install`
+- Get gxx for linux in conda by running `poe get-gxx`
 - (Optional) If you are on Windows and need to install PyTorch with CUDA compatibility, please run
 `poe torch-cuda-win`
 
