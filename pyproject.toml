@@ -28,5 +28,5 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poe.tasks]
-torch-cuda-win = "pip install torch==1.8.1+cu102 torchvision==0.9.1+cu102 torchaudio===0.8.1 -f https://download.pytorch.org/whl/torch_stable.html"
-torch-cuda-linux = "pip install torch torchvision torchaudio"
+get-gxx = "conda install -c anaconda gxx_linux-64"
+get-torch-cuda = "conda install pytorch torchvision torchaudio cudatoolkit=11.1 -c pytorch -c conda-forge"
