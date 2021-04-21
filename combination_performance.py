@@ -1,4 +1,5 @@
 # Initialize connection with rest of lib
+import logging
 import rdkit
 from utils import *
 from DL_ClassifierModel import *
@@ -6,20 +7,19 @@ import os
 from pathlib import Path
 import torch
 
-log_file = 'results_combination_of_models.txt'
+log_file = 'results_combination_of_models.log'
+log_format = '%(asctime)s : %(levelname)s : %(message)s'
+logging.basicConfig(format=log_format, filename = log_file, level=logging.DEBUG)
+logger = logging.getLogger()
 
-def write_file(setting, training_data, valid_data, test_data):
-    if os.path.exists(log_file):
-        action = 'a'
-    else:
-        action = 'w'
-    file = open(log_file, action)
-    file.write(f'Conditions --> pEmbeddings: {setting["pEmbeddings"]}, kmers: {setting["kmers"]}, pSeq: {setting["pSeq"]}, FP: {setting["FP"]}, dSeq: {setting["dSeq"]}, ST_fingerprint: {setting["ST_fingerprint"]}\n')
-    file.write(f'Training --> AUC = {training_data[0]}, ACC = {training_data[1]}\n')
-    file.write(f'Validation --> AUC = {valid_data[0]}, ACC = {valid_data[1]}\n')
-    file.write(f'Test --> AUC = {test_data[0]}, ACC = {test_data[1]}\n')
-    file.write('\n')
-    file.close()
+def log(setting, training_data, valid_data, test_data):
+    logger.debug(f'Conditions --> pEmbeddings: {setting["pEmbeddings"]}, kmers: {setting["kmers"]}, pSeq: {setting["pSeq"]}, FP: {setting["FP"]}, dSeq: {setting["dSeq"]}, ST_fingerprint: {setting["ST_fingerprint"]}\n')
+    logger.info(f'Training --> AUC = {training_data[0]}, ACC = {training_data[1]}\n')
+    logger.info(f'Validation --> AUC = {valid_data[0]}, ACC = {valid_data[1]}\n')
+    logger.info(f'Test --> AUC = {test_data[0]}, ACC = {test_data[1]}\n')
+    logger.info('\n')
+
+
 
 #Training data binding DB
 data = "bindingdb"
@@ -73,7 +73,7 @@ for method in ['DTI_Bridge', 'ST_Bridge', 'p_Embedding_Bridge', 'p_Emb_ST_Bridge
                 train_mean = np.mean(np.array(train_stats), axis = 0)
                 valid_mean = np.mean(np.array(valid_stats), axis = 0)
                 test_mean = np.mean(np.array(test_stats), axis = 0)
-                write_file(useFeatures, train_mean, valid_mean, test_mean)
+                log(useFeatures, train_mean, valid_mean, test_mean)
 
     elif method == 'ST_Bridge':
         for (kmers, pSeq) in [(True, True), (True, False), (False, True), (False, False)]:
@@ -110,7 +110,7 @@ for method in ['DTI_Bridge', 'ST_Bridge', 'p_Embedding_Bridge', 'p_Emb_ST_Bridge
                 train_mean = np.mean(np.array(train_stats), axis = 0)
                 valid_mean = np.mean(np.array(valid_stats), axis = 0)
                 test_mean = np.mean(np.array(test_stats), axis = 0)
-                write_file(useFeatures, train_mean, valid_mean, test_mean)
+                log(useFeatures, train_mean, valid_mean, test_mean)
     
     elif method == 'p_Embedding_Bridge':
         for (FP, dSeq) in [(True, True), (True, False), (False, True), (False, False)]:
@@ -147,7 +147,7 @@ for method in ['DTI_Bridge', 'ST_Bridge', 'p_Embedding_Bridge', 'p_Emb_ST_Bridge
                 train_mean = np.mean(np.array(train_stats), axis = 0)
                 valid_mean = np.mean(np.array(valid_stats), axis = 0)
                 test_mean = np.mean(np.array(test_stats), axis = 0)
-                write_file(useFeatures, train_mean, valid_mean, test_mean)
+                log(useFeatures, train_mean, valid_mean, test_mean)
     
 
     elif method == 'p_Emb_ST_Bridge':    
@@ -186,7 +186,7 @@ for method in ['DTI_Bridge', 'ST_Bridge', 'p_Embedding_Bridge', 'p_Emb_ST_Bridge
         train_mean = np.mean(np.array(train_stats), axis = 0)
         valid_mean = np.mean(np.array(valid_stats), axis = 0)
         test_mean = np.mean(np.array(test_stats), axis = 0)
-        write_file(useFeatures, train_mean, valid_mean, test_mean)    
+        log(useFeatures, train_mean, valid_mean, test_mean)    
 
                 
 
