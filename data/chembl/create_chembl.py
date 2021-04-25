@@ -149,6 +149,15 @@ chembl2smiles = create_smiles_data(actinact_path)
 print("Length of dict/number of unique drugs:",len(chembl2smiles))
 '''
 if __name__ == "__main__":
+    # Make the split file if it doesn't exist yet.
+    if not Path.exists(actinact_path):
+        import subprocess
+
+        try:
+            rc = subprocess.call("./sleep.sh", shell=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Couldn't run script!, Error: {e}")
+
     chembl2smiles = create_smiles_data(actinact_path)
     # print("\nCreate chembl2aaseq data")
     # chembl2aaseq = create_aa_data(protein_file, uniprot_path)
