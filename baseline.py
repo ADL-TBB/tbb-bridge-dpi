@@ -15,12 +15,21 @@ logging.basicConfig(format=log_format, filename=log_file,  level=logging.DEBUG)
 logger = logging.getLogger()
 logger.addHandler(fhandler)
 
-def log(setting, training_data, valid_data, test_data):
-    logger.debug(f'Conditions --> pEmbeddings: {setting["pEmbeddings"]}, kmers: {setting["kmers"]}, pSeq: {setting["pSeq"]}, FP: {setting["FP"]}, dSeq: {setting["dSeq"]}, ST_fingerprint: {setting["ST_fingerprint"]}\n')
+def log(data, setting, training_data, valid_data, test_data):
+    logger.debug(f'Data: {data}, Conditions --> pEmbeddings: {setting["pEmbeddings"]}, kmers: {setting["kmers"]}, pSeq: {setting["pSeq"]}, FP: {setting["FP"]}, dSeq: {setting["dSeq"]}, ST_fingerprint: {setting["ST_fingerprint"]}\n')
     logger.info(f'Training --> AUC = {training_data[0]}, ACC = {training_data[1]}\n')
     logger.info(f'Validation --> AUC = {valid_data[0]}, ACC = {valid_data[1]}\n')
     logger.info(f'Test --> AUC = {test_data[0]}, ACC = {test_data[1]}\n')
     logger.info('\n')
+
+def log_per_iteration(data, setting, train, valid, test):
+    logger.debug(f'single iteration')
+    logger.debug(f'Data: {data}, Conditions --> pEmbeddings: {setting["pEmbeddings"]}, kmers: {setting["kmers"]}, pSeq: {setting["pSeq"]}, FP: {setting["FP"]}, dSeq: {setting["dSeq"]}, ST_fingerprint: {setting["ST_fingerprint"]}\n')
+    logger.info(f'Training --> AUC = {train[0]}, ACC = {train[1]}\n')
+    logger.info(f'Validation --> AUC = {valid[0]}, ACC = {valid[1]}\n')
+    logger.info(f'Test --> AUC = {test[0]}, ACC = {test[1]}\n')
+    logger.info('\n')
+
 
 
 #Training data binding DB
@@ -70,10 +79,12 @@ for data in ["celegans", "human"]:
         metrictor = Metrictor()
         metrictor.set_data(Ypre, Y)
         test_stats.append([metrictor.ACC(), metrictor.AUC()])
+
+        log_per_iteration(data, useFeatures, model.final_res['training'], model.final_res['valid'], [metrictor.ACC(), metrictor.AUC()])
         print(f'done iteration {iter} on test {data}')
 
     train_mean = np.mean(np.array(train_stats), axis=0)
     valid_mean = np.mean(np.array(valid_stats), axis=0)
     test_mean = np.mean(np.array(test_stats), axis=0)
-    log(useFeatures, train_mean, valid_mean, test_mean)
+    log(data, useFeatures, train_mean, valid_mean, test_mean)
 
