@@ -9,7 +9,7 @@ import torch
 
 log_file = 'baseline.log'
 log_format = '%(asctime)s : %(levelname)s : %(message)s'
-fhandler = logging.FileHandler(filename='mylog.log', mode='a')
+fhandler = logging.FileHandler(filename='baseline.log', mode='a')
 logging.basicConfig(format=log_format, filename=log_file,  level=logging.DEBUG)
 
 logger = logging.getLogger()
