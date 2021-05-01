@@ -23,7 +23,6 @@ def log(fc_dropout, setting, training_data, valid_data, test_data):
 
 #Training data binding DB
 data = "bindingdb"
-save_path = "TEST_bindingdb"
 
 
 data_path = Path(os.path.join("data", data))
@@ -38,6 +37,7 @@ test = np.array(data_class.eSeqData['test'])
 #Iterate on the separate possible methods
 for dropout in [0, 0.1, 0.2, 0.3, 0.4]:
     for method in ['DTI_Bridge', 'p_Embedding_Bridge']:
+        save_path = f"bindingdb_DO_{dropout}_model_{method}"
         if method == 'DTI_Bridge':
             for (kmers, pSeq) in [(True, True)]:
                 for (FP, dSeq) in [(True, True)]:

@@ -38,6 +38,7 @@ test = np.array(data_class.eSeqData['test'])
 #Iterate on the separate possible methods
 for number_of_graph_nodes in [[64,64],[256,256]]:
     for method in ['DTI_Bridge', 'p_Embedding_Bridge']:
+        save_path = f"bindingdb_hypern_{number_of_graph_nodes[0]}_{number_of_graph_nodes[1]}_model_{method}"
         if method == 'DTI_Bridge':
             for (kmers, pSeq) in [(True, True)]:
                 for (FP, dSeq) in [(True, True)]:
