@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -11,6 +11,7 @@ from chembl_webresource_client.new_client import new_client
 import pickle
 import logging
 from tqdm import tqdm
+from itertools import islice
 
 # Logger Setup
 log_file = 'chembl_dataset.log'
@@ -73,12 +74,41 @@ def create_aa_data(data_path, uniprot_path):
     return chembl2aaseq
 
 
+def batch_create_smiles_data(data_path: Path, chunk_size=50) -> Dict:
+    """
+    Input: act_inact file (all examples)
+    Creates dictionary with SMILES for each ChEMBL ID in the examples using chunks of IDs
+    for more efficient processing
+    """
+    chembl2smiles = dict()
+
+    if not Path.exists(data_path):
+        logger.error(f"File '{data_path}' does not exist, please check if you entered the right path.")
+        raise FileNotFoundError(f"file {data_path} does not exist.")
+
+    with open(file=data_path, mode='r') as file:
+        print(f"Reading in data file @ '{data_path}'...")
+        for line in tqdm(file.read().splitlines()):
+            chembl2smiles[line] = None
+
+    keys = list(chembl2smiles.keys())
+
+    print("Mapping ChEMBL ID <--> Canonical SMILES...")
+    for i in range(0, len(keys), chunk_size):
+        activities = new_client.activity.filter(molecule_chembl_id__in=keys[i:i + chunk_size]).only(
+            ['molecule_chembl_id', 'canonical_smiles'])
+
+        for act in tqdm(activities):
+            chembl2smiles[act['molecule_chembl_id']] = act['canonical_smiles']
+
+    return chembl2smiles
+
 def create_smiles_data(data_path):
     """
     Input: act_inact file (all examples)
     Creates dictionary with SMILES for each ChEMBL ID in the examples
     """
-    chembl2smiles = {}
+    chembl2smiles = dict()
     unavailable = 0
 
     with open(file=data_path, mode='r') as f:
@@ -143,31 +173,19 @@ def read_data(data_path, chembl2smiles, chembl2aaseq):
     return data
 
 
-'''
-print("\nCreate chembl2smiles data")
-chembl2smiles = create_smiles_data(actinact_path)
-print("Length of dict/number of unique drugs:",len(chembl2smiles))
-'''
-if __name__ == "__main__":
-    # Make the split file if it doesn't exist yet.
-    if not Path.exists(actinact_path):
+def check_split_file(split_file_path: Path):
+    """
+    Helper function that confirms if the preprocessed split file exists and creates it if it does not.
+    """
+    if not Path.exists(split_file_path):
         import subprocess
 
         try:
-            rc = subprocess.call("./sleep.sh", shell=True)
+            rc = subprocess.call("./split_actinact.sh", shell=True)
         except subprocess.CalledProcessError as e:
             print(f"Couldn't run script!, Error: {e}")
 
-    chembl2smiles = create_smiles_data(actinact_path)
-    # print("\nCreate chembl2aaseq data")
-    # chembl2aaseq = create_aa_data(protein_file, uniprot_path)
-    # pickle.dump(chembl2aaseq, open("chembl2aaseq.pkl", "wb"))
-    # # chembl2aaseq = pickle.load(open("chembl2aaseq.pkl", "rb"))
-    # print("Length of dict/number of unique proteins:", len(chembl2aaseq))
 
-'''
-print("\nCreate training data [smiles, aa-seq, label]")
-data = read_data(actinact_path, chembl2smiles, chembl2aaseq)
-print("Number of examples:", len(data))
-print("First example:\n",data[0])
-'''
+if __name__ == "__main__":
+    check_split_file(actinact_path)  # Make the split file if it doesn't exist yet.
+    chembl2smiles = batch_create_smiles_data(actinact_path, chunk_size=200)
