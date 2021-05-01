@@ -33,18 +33,18 @@ def log_per_iteration(data, setting, train, valid, test):
 
 
 #Training data binding DB
-data = "celegans"
+data = "bindingdb"
 # data = "human"
 
 
 
-for data in ["celegans", "human"]:
+for data in ["bindingdb"]:
 
     data_path = Path(os.path.join("data", data))
     assert data_path.exists()
 
     # Get the human/celegans class
-    data_class = LoadCelegansHuman(dataPath=data_path)
+    data_class = LoadBindingDB(dataPath=data_path)
 
     # Set up the test set
     test = np.array(data_class.eSeqData['test'])

@@ -35,7 +35,7 @@ data_class = LoadBindingDB(dataPath=data_path)
 test = np.array(data_class.eSeqData['test'])
 
 #Iterate on the separate possible methods
-for dropout in [0, 0.1, 0.2, 0.3, 0.4]:
+for dropout in [0, 0.2, 0.3, 0.4, 0.5]:
     for method in ['DTI_Bridge', 'p_Embedding_Bridge']:
         save_path = f"bindingdb_DO_{dropout}_model_{method}"
         if method == 'DTI_Bridge':
@@ -57,7 +57,7 @@ for dropout in [0, 0.1, 0.2, 0.3, 0.4]:
                             fHiddenSizeList=[1024, 256],
                             fSize=1024, cSize=data_class.pContFeat.shape[1],
                             gcnHiddenSizeList=[128,128], fcHiddenSizeList=[128], nodeNum=64,
-                            hdnDropout=0.5, fcDropout=dropout, device=torch.device('cuda'), 
+                            hdnDropout=dropout, fcDropout=0.2, device=torch.device('cuda'), 
                             useFeatures=useFeatures)
                         model.train(data_class, trainSize=512, batchSize=512, epoch=128,
                             stopRounds=-1, earlyStop=30,
@@ -94,7 +94,7 @@ for dropout in [0, 0.1, 0.2, 0.3, 0.4]:
                             fHiddenSizeList=[1024, 256],
                             fSize=1024, cSize=data_class.pContFeat.shape[1],
                             gcnHiddenSizeList=[128,128], fcHiddenSizeList=[128], nodeNum=64,
-                            hdnDropout=0.5, fcDropout=dropout, device=torch.device('cuda'), 
+                            hdnDropout=dropout, fcDropout=0.2, device=torch.device('cuda'), 
                             useFeatures=useFeatures)
                         model.train(data_class, trainSize=512, batchSize=512, epoch=128,
                             stopRounds=-1, earlyStop=30,
