@@ -91,6 +91,8 @@ class BaseClassifier:
               optimType='Adam', preheat=5, lr1=0.001, lr2=0.00003, momentum=0.9, weightDecay=0, isHigherBetter=True,
               metrics="AUC", report=["ACC", "AUC"],
               savePath='model'):
+        
+        self.final_res = {'training':[], 'valid':[]}
         assert batchSize % trainSize == 0
         metrictor = Metrictor()
         self.stepCounter = 0
@@ -189,12 +191,16 @@ class BaseClassifier:
             trainSize, type='train', device=self.device))
         metrictor.set_data(Y_pre, Y)
         metrictor(report)
+        self.final_res['training'].append(metrictor.ACC())
+        self.final_res['training'].append(metrictor.AUC())
 
         print(f'[Total Valid]', end='')
         Y_pre, Y = self.calculate_y_prob_by_iterator(dataClass.one_epoch_batch_data_stream(
             trainSize, type='valid', device=self.device))
         metrictor.set_data(Y_pre, Y)
         res = metrictor(report)
+        self.final_res['valid'].append(metrictor.ACC())
+        self.final_res['valid'].append(metrictor.AUC())
 
         if dataClass.testSampleNum > 0:
             print(f'[Total Test]', end='')
@@ -289,15 +295,14 @@ class BaseClassifier:
 
     def calculate_y_prob_by_iterator(self, dataStream):
         YArr, Y_preArr = [], []
-        while True:
-            try:
-                X, Y = next(dataStream)
-            except:
-                break
+        for minibatch in dataStream:
+            X, Y = minibatch
+
             Y_pre, Y = self.calculate_y_prob(
                 X, mode='predict').cpu().data.numpy(), Y.cpu().data.numpy()
             YArr.append(Y)
             Y_preArr.append(Y_pre)
+
         YArr, Y_preArr = np.hstack(YArr).astype(
             'int32'), np.hstack(Y_preArr).astype('float32')
         return Y_preArr, YArr
@@ -305,18 +310,14 @@ class BaseClassifier:
     # New function to calculate scores for seen/unseen proteins separately
     def calculate_y_with_seenbool(self, dataStream):
         YArr, Y_preArr, seenbool = [], [], []
+        for minibatch in dataStream:
+            X, Y = minibatch
 
-        while True:
-            try:
-                X, Y = next(dataStream)
-            except:
-                break
             Y_pre, Y = self.calculate_y_prob(X, mode='predict').cpu().data.numpy(), Y.cpu().data.numpy()
-            
             seenbool.append(X['seenbool'].cpu())
-
             YArr.append(Y)
             Y_preArr.append(Y_pre)
+
         YArr, Y_preArr, seenbool = np.hstack(YArr).astype('int32'), np.hstack(Y_preArr).astype('float32'), np.hstack(seenbool).astype(bool)
         return Y_preArr, YArr, seenbool
 
@@ -353,12 +354,11 @@ class Parent_Bridge(BaseClassifier):
     def __init__(self, outSize,
                  cHiddenSizeList,
                  fHiddenSizeList,
-                 fSize=1024, cSize=8422,
-                 gcnHiddenSizeList=[], fcHiddenSizeList=[], nodeNum=32, resnet=True,
-                 hdnDropout=0.1, fcDropout=0.2, device=torch.device('cuda'),
-                 useFeatures={"pEmbeddings": False, "kmers": False, "pSeq": True,
-                              "FP": True, "dSeq": True},
-                 maskDTI=False):
+                 fSize, cSize,
+                 gcnHiddenSizeList, fcHiddenSizeList, nodeNum, resnet,
+                 hdnDropout, fcDropout, device,
+                 useFeatures,
+                 maskDTI):
         
         self.nodeEmbedding = TextEmbedding(torch.tensor(np.random.normal(size=(max(
             nodeNum, 0), outSize)), dtype=torch.float32), dropout=hdnDropout, name='nodeEmbedding').to(device)
@@ -366,8 +366,6 @@ class Parent_Bridge(BaseClassifier):
         self.amEmbedding = TextEmbedding(
             torch.eye(24), dropout=hdnDropout, freeze=True, name='amEmbedding').to(device)
         self.pCNN = TextCNN(24, 64, [25], ln=True, name='pCNN').to(device)
-        self.pFcLinear = MLP(64, outSize, dropout=hdnDropout, bnEveryLayer=True,
-                             dpEveryLayer=True, outBn=True, outAct=True, outDp=True, name='pFcLinear').to(device)
 
         self.dCNN = TextCNN(75, 64, [7], ln=True, name='dCNN').to(device)
         self.dFcLinear = MLP(64, outSize, dropout=hdnDropout, bnEveryLayer=True,
@@ -391,11 +389,26 @@ class Parent_Bridge(BaseClassifier):
         self.maskDTI = maskDTI
         
     def calculate_y_logit(self, X, mode='train'):
+
+        if self.useFeatures["pEmbeddings"]:
+            Xam = (self.p_emb_pFcLinear(X['pEmbeddings']).unsqueeze(1) if self.useFeatures['pEmbeddings'] else 0)  # => batchSize × 1 × outSize
+        else:
+            Xam = (self.cFcLinear(X['aminoCtr']).unsqueeze(1) if self.useFeatures['kmers'] else 0) + \
+              (self.pFcLinear(self.pCNN(self.amEmbedding(X['aminoSeq']))).unsqueeze(
+                  1) if self.useFeatures['pSeq'] else 0)  # => batchSize × 1 × outSize
+        if self.useFeatures["ST_fingerprint"]:
+            Xat = self.STLinear(X['ST_fingerprint']).unsqueeze(1)  # changed to fit the transformer fingerprint MLP
+        else:
+            Xat = (self.fFcLinear(X['atomFin']).unsqueeze(1) if self.useFeatures['FP'] else 0) + \
+              (self.dFcLinear(self.dCNN(X['atomFea'])).unsqueeze(
+                  1) if self.useFeatures['dSeq'] else 0)  # => batchSize × 1 × outSize
+
+
         if self.nodeNum > 0:
             node = self.nodeEmbedding.dropout2(self.nodeEmbedding.dropout1(
-                self.nodeEmbedding.embedding.weight)).repeat(len(self.Xat), 1, 1)
+                self.nodeEmbedding.embedding.weight)).repeat(len(Xat), 1, 1)
             # => batchSize × nodeNum × outSize
-            node = torch.cat([self.Xam, self.Xat, node], dim=1)
+            node = torch.cat([Xam, Xat, node], dim=1)
             # => batchSize × nodeNum × 1
             nodeDist = torch.sqrt(torch.sum(node ** 2, dim=2, keepdim=True) + 1e-8)
 
@@ -408,7 +421,7 @@ class Parent_Bridge(BaseClassifier):
             if self.maskDTI:
                 cosNode[:, 0, 1] = cosNode[:, 1, 0] = 0
             D = torch.eye(node.shape[1], dtype=torch.float32, device=self.device).repeat(
-                len(self.Xam), 1, 1)  # => batchSize × nodeNum × nodeNum
+                len(Xam), 1, 1)  # => batchSize × nodeNum × nodeNum
             D[:, range(node.shape[1]), range(node.shape[1])] = 1 / \
                                                                (torch.sum(cosNode, dim=2) ** 0.5)
             # => batchSize × batchnodeNum × nodeNumSize
@@ -419,42 +432,66 @@ class Parent_Bridge(BaseClassifier):
             node_embed = node_gcned[:, 0, :] * \
                          node_gcned[:, 1, :]  # => batchSize × outSize
         else:
-            node_embed = (self.Xam * self.Xat).squeeze(dim=1)  # => batchSize × outSize
+            node_embed = (Xam * Xat).squeeze(dim=1)  # => batchSize × outSize
         # if self.resnet:
         #    node_gcned += torch.cat([Xam[:,0,:],Xat[:,0,:]],dim=1)
         # , "loss":1*l2}
         return {"y_logit": self.fcLinear(node_embed).squeeze(dim=1)}
 
 class DTI_Bridge(Parent_Bridge):
-    def __init__(self):
+    def __init__(self, outSize,
+                 cHiddenSizeList,
+                 fHiddenSizeList,
+                 fSize=1024, cSize=8422,
+                 gcnHiddenSizeList=[], fcHiddenSizeList=[], nodeNum=32, resnet=True,
+                 hdnDropout=0.1, fcDropout=0.2, device=torch.device('cuda'),
+                 useFeatures={"pEmbeddings": False, "kmers": True, "pSeq": True,
+                              "FP": True, "dSeq": True, "ST_fingerprint": False},
+                 maskDTI=False):
         
-        self.useFeatures["kmers"]=True # this is different for each model
-    
+        Parent_Bridge.__init__(self, outSize,
+                 cHiddenSizeList,
+                 fHiddenSizeList,
+                 fSize, cSize,
+                 gcnHiddenSizeList, fcHiddenSizeList, nodeNum, resnet,
+                 hdnDropout, fcDropout, device,
+                 useFeatures,
+                 maskDTI)
+        
         self.fFcLinear = MLP(fSize, outSize, fHiddenSizeList, outAct=True, name='fFcLinear',
                              dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
             device)
         self.cFcLinear = MLP(cSize, outSize, cHiddenSizeList, outAct=True, name='cFcLinear',
                              dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
             device)
-                                 
+        
+        self.pFcLinear = MLP(64, outSize, dropout=hdnDropout, bnEveryLayer=True,
+                             dpEveryLayer=True, outBn=True, outAct=True, outDp=True, name='pFcLinear').to(device)
+
         self.moduleList = nn.ModuleList(
             [self.nodeEmbedding, self.cFcLinear, self.fFcLinear, self.nodeGCN, self.fcLinear,
              self.amEmbedding, self.pCNN, self.pFcLinear, self.dCNN, self.dFcLinear])
-        
-        self.Xam = (self.cFcLinear(X['aminoCtr']).unsqueeze(1) if self.useFeatures['kmers'] else 0) + \
-              (self.pFcLinear(self.pCNN(self.amEmbedding(X['aminoSeq']))).unsqueeze(
-                  1) if self.useFeatures['pSeq'] else 0)  # => batchSize × 1 × outSize
-        self.Xat = (self.fFcLinear(X['atomFin']).unsqueeze(1) if self.useFeatures['FP'] else 0) + \
-              (self.dFcLinear(self.dCNN(X['atomFea'])).unsqueeze(
-                  1) if self.useFeatures['dSeq'] else 0)  # => batchSize × 1 × outSize
-              
-
 
 class ST_Bridge(Parent_Bridge):
-    def __init__(self):
+    def __init__(self, outSize,
+                 cHiddenSizeList,
+                 fHiddenSizeList,
+                 fSize=1024, cSize=8422,
+                 gcnHiddenSizeList=[], fcHiddenSizeList=[], nodeNum=32, resnet=True,
+                 hdnDropout=0.1, fcDropout=0.2, device=torch.device('cuda'),
+                 useFeatures={"pEmbeddings": False, "kmers": True, "pSeq": True,
+                     "FP": True, "dSeq": True, "ST_fingerprint": True},
+                 maskDTI=False):
         
-        self.useFeatures["kmers"]=True # this is different for each model
-        
+        Parent_Bridge.__init__(self, outSize,
+                 cHiddenSizeList,
+                 fHiddenSizeList,
+                 fSize, cSize,
+                 gcnHiddenSizeList, fcHiddenSizeList, nodeNum, resnet,
+                 hdnDropout, fcDropout, device,
+                 useFeatures,
+                 maskDTI)
+
         self.STLinear = MLP(fSize, outSize, fHiddenSizeList, outAct=True, name='STLinear',
                             dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
                             device) # altered MLP layer for SMILES transformer
@@ -462,38 +499,70 @@ class ST_Bridge(Parent_Bridge):
         self.cFcLinear = MLP(cSize, outSize, cHiddenSizeList, outAct=True, name='cFcLinear',
                              dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
             device)
+        
+        self.pFcLinear = MLP(64, outSize, dropout=hdnDropout, bnEveryLayer=True,
+                             dpEveryLayer=True, outBn=True, outAct=True, outDp=True, name='pFcLinear').to(device)
 
         self.moduleList = nn.ModuleList(
             [self.nodeEmbedding, self.cFcLinear, self.STLinear, self.nodeGCN, self.fcLinear,
-             self.amEmbedding, self.pCNN, self.pFcLinear, self.dCNN])
-        self.sampleType = 'CEL'
+             self.amEmbedding, self.pCNN, self.pFcLinear])
         
-        self.Xam = (self.cFcLinear(X['aminoCtr']).unsqueeze(1) if self.useFeatures['kmers'] else 0) + \
-              (self.pFcLinear(self.pCNN(self.amEmbedding(X['aminoSeq']))).unsqueeze(
-                  1) if self.useFeatures['pSeq'] else 0)  # => batchSize × 1 × outSize
-        self.Xat = self.STLinear(X['ST_fingerprint']).unsqueeze(1)  # changed to fit the transformer fingerprint MLP
-        
+class p_Embedding_Bridge(Parent_Bridge):
+    def __init__(self, outSize,
+                 cHiddenSizeList,
+                 fHiddenSizeList,
+                 fSize=1024, cSize=8422,
+                 gcnHiddenSizeList=[], fcHiddenSizeList=[], nodeNum=32, resnet=True,
+                 hdnDropout=0.1, fcDropout=0.2, device=torch.device('cuda'),
+                 useFeatures={"pEmbeddings": True, "kmers": False, "pSeq": True,
+                              "FP": True, "dSeq": True, "ST_fingerprint": False},
+                 maskDTI=False):
 
-        
-class p_Embedding_bridge(Parent_Bridge):
-    def __init__(self):
-        self.useFeatures["pEmbeddings"]=True # this is different for each model
-        
+        Parent_Bridge.__init__(self, outSize,
+                 cHiddenSizeList,
+                 fHiddenSizeList,
+                 fSize, cSize,
+                 gcnHiddenSizeList, fcHiddenSizeList, nodeNum, resnet,
+                 hdnDropout, fcDropout, device,
+                 useFeatures,
+                 maskDTI)
+
+        self.p_emb_pFcLinear = MLP(fSize, outSize, fHiddenSizeList, outAct=True, name='p_emb_pFcLinear',
+                             dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(device)
+
         self.fFcLinear = MLP(fSize, outSize, fHiddenSizeList, outAct=True, name='fFcLinear',
                              dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
             device)
-        self.cFcLinear = MLP(cSize, outSize, cHiddenSizeList, outAct=True, name='cFcLinear',
-                             dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
-            device)
 
-        self.moduleList = nn.ModuleList([self.nodeEmbedding, self.fFcLinear, self.nodeGCN, self.fcLinear, self.pFcLinear, self.dCNN, self.dFcLinear])
+        self.moduleList = nn.ModuleList([self.nodeEmbedding, self.fFcLinear, self.nodeGCN, self.fcLinear, self.p_emb_pFcLinear, self.dCNN, self.dFcLinear])
+       
+class p_Emb_ST_Bridge(Parent_Bridge):
+    def __init__(self, outSize,
+                 cHiddenSizeList,
+                 fHiddenSizeList,
+                 fSize=1024, cSize=8422,
+                 gcnHiddenSizeList=[], fcHiddenSizeList=[], nodeNum=32, resnet=True,
+                 hdnDropout=0.1, fcDropout=0.2, device=torch.device('cuda'),
+                 useFeatures={"pEmbeddings": True, "kmers": False, "pSeq": True,
+                              "FP": True, "dSeq": True, "ST_fingerprint": True},
+                 maskDTI=False):
+
+        Parent_Bridge.__init__(self, outSize,
+                 cHiddenSizeList,
+                 fHiddenSizeList,
+                 fSize, cSize,
+                 gcnHiddenSizeList, fcHiddenSizeList, nodeNum, resnet,
+                 hdnDropout, fcDropout, device,
+                 useFeatures,
+                 maskDTI)
         
-        self.Xam = (self.pFcLinear(X['pEmbeddings']).unsqueeze(1) if self.useFeatures['pEmbeddings'] else 0)  # => batchSize × 1 × outSize
-        self.Xat = (self.fFcLinear(X['atomFin']).unsqueeze(1) if self.useFeatures['FP'] else 0) + \
-              (self.dFcLinear(self.dCNN(X['atomFea'])).unsqueeze(
-                  1) if self.useFeatures['dSeq'] else 0)  # => batchSize × 1 × outSize
-        
-        self.Xam = (self.pFcLinear(X['pEmbeddings']).unsqueeze(1) if self.useFeatures['pEmbeddings'] else 0)  # => batchSize × 1 × outSize
-        self.Xat = (self.fFcLinear(X['atomFin']).unsqueeze(1) if self.useFeatures['FP'] else 0) + \
-              (self.dFcLinear(self.dCNN(X['atomFea'])).unsqueeze(
-                  1) if self.useFeatures['dSeq'] else 0)  # => batchSize × 1 × outSize
+        self.STLinear = MLP(fSize, outSize, fHiddenSizeList, outAct=True, name='STLinear',
+                            dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
+                            device) # altered MLP layer for SMILES transformer
+    
+        self.p_emb_pFcLinear = MLP(fSize, outSize, fHiddenSizeList, outAct=True, name='p_emb_pFcLinear',
+                             dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(device)
+
+        self.moduleList = nn.ModuleList([self.nodeEmbedding, self.STLinear, self.nodeGCN, self.fcLinear, 
+            self.p_emb_pFcLinear])
+
