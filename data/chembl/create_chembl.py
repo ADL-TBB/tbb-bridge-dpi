@@ -8,7 +8,7 @@ import requests as re
 from Bio import SeqIO
 from io import StringIO
 from chembl_webresource_client.new_client import new_client
-import pickle
+import pickle as pkl
 import logging
 from tqdm import tqdm
 from itertools import islice
@@ -74,13 +74,14 @@ def create_aa_data(data_path, uniprot_path):
     return chembl2aaseq
 
 
-def batch_create_smiles_data(data_path: Path, chunk_size=50) -> Dict:
+def batch_create_smiles_data(data_path: Path, start_index=0, chunk_size=50, save_iterations=5000) -> Dict:
     """
     Input: act_inact file (all examples)
     Creates dictionary with SMILES for each ChEMBL ID in the examples using chunks of IDs
     for more efficient processing
     """
     chembl2smiles = dict()
+    starting_drug = 0
 
     if not Path.exists(data_path):
         logger.error(f"File '{data_path}' does not exist, please check if you entered the right path.")
@@ -92,15 +93,22 @@ def batch_create_smiles_data(data_path: Path, chunk_size=50) -> Dict:
             chembl2smiles[line] = None
 
     keys = list(chembl2smiles.keys())
-
+    chembl2smiles = dict()
     print("Mapping ChEMBL ID <--> Canonical SMILES...")
-    for i in range(0, len(keys), chunk_size):
+    for i in range(start_index, len(keys), chunk_size):
+        if i > 0 and i%save_iterations == 0:
+            filename = f"chembl2smiles_{str(starting_drug)}-{str(starting_drug+save_iterations)}.pkl"
+            with open(filename, mode='wb') as f:
+                pkl.dump(chembl2smiles, f)
+            starting_drug += save_iterations
+            chembl2smiles = dict()
+
         activities = new_client.activity.filter(molecule_chembl_id__in=keys[i:i + chunk_size]).only(
             ['molecule_chembl_id', 'canonical_smiles'])
 
         for act in tqdm(activities):
             chembl2smiles[act['molecule_chembl_id']] = act['canonical_smiles']
-
+        
     return chembl2smiles
 
 def create_smiles_data(data_path):
@@ -188,4 +196,4 @@ def check_split_file(split_file_path: Path):
 
 if __name__ == "__main__":
     check_split_file(actinact_path)  # Make the split file if it doesn't exist yet.
-    chembl2smiles = batch_create_smiles_data(actinact_path, chunk_size=200)
+    chembl2smiles = batch_create_smiles_data(actinact_path, start_index=0, chunk_size=200, save_iterations=10000)
