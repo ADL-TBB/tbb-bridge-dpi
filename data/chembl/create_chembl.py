@@ -81,7 +81,6 @@ def batch_create_smiles_data(data_path: Path, start_index=0, chunk_size=50, save
     for more efficient processing
     """
     chembl2smiles = dict()
-    starting_drug = 0
 
     if not Path.exists(data_path):
         logger.error(f"File '{data_path}' does not exist, please check if you entered the right path.")
@@ -96,12 +95,12 @@ def batch_create_smiles_data(data_path: Path, start_index=0, chunk_size=50, save
     chembl2smiles = dict()
     print("Mapping ChEMBL ID <--> Canonical SMILES...")
     for i in range(start_index, len(keys), chunk_size):
-        if i > 0 and i%save_iterations == 0:
-            filename = f"chembl2smiles_{str(starting_drug)}-{str(starting_drug+save_iterations)}.pkl"
+        if i > start_index and i%save_iterations == 0:
+            filename = f"chembl2smiles_{str(i-save_iterations)}-{str(i)}.pkl"
             with open(filename, mode='wb') as f:
                 pkl.dump(chembl2smiles, f)
-            starting_drug += save_iterations
             chembl2smiles = dict()
+            print(f"Saved partial mappings to \"{filename}\" and cleared dictionary")
 
         activities = new_client.activity.filter(molecule_chembl_id__in=keys[i:i + chunk_size]).only(
             ['molecule_chembl_id', 'canonical_smiles'])
@@ -196,4 +195,4 @@ def check_split_file(split_file_path: Path):
 
 if __name__ == "__main__":
     check_split_file(actinact_path)  # Make the split file if it doesn't exist yet.
-    chembl2smiles = batch_create_smiles_data(actinact_path, start_index=0, chunk_size=200, save_iterations=10000)
+    chembl2smiles = batch_create_smiles_data(actinact_path, start_index=0, chunk_size=200, save_iterations=5000)
