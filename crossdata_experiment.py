@@ -92,11 +92,10 @@ for experiment in experiments:
 
     for method in ['DTI_Bridge', 'p_Embedding_Bridge']:
         
-        save_path = f"experiment_{method}_{experiment}"
-        
         train_stats, valid_stats, test_stats = [], [], []
 
-        for _ in range(repetitions):
+        for i in range(repetitions):
+            save_path = f"experiment_{i}_{method}_{experiment}"
             if experiment == ["bindingdb", "celegans"]:
                 data_class = Load_trainBDB_testCElegans(dataPath = [data_path_bdb, data_path_celegans])
             
