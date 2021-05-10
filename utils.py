@@ -924,3 +924,174 @@ class Load_trainCElegans_testHuman(BaseLoader):
         for protein in self.p2id.keys():
             id2emb.append(emb_dict[protein])
         return id2emb
+
+class Load_trainHuman_testBDB(BaseLoader):
+    def load_data(self, data_path, valid_size=0.1):
+        print('\nReading the raw data...')
+
+        path_human = data_path[0]
+        path_bindingdb = data_path[1]
+
+        data = {'train': [], 'valid': [], 'test': []}
+
+        # Read Human data into training set
+        temp = []
+        file = open(os.path.join(path_human, 'data.txt'), 'r')
+        for line in file.readlines():
+            if line == '':
+                break
+            drug, protein, label = line.strip().split(' ')
+            temp.append(np.array((drug, protein, int(label))))
+        file.close()
+        # np.random.shuffle(temp)
+        samples = len(temp)
+        split = int((1 - valid_size) * samples)
+        data['train'] = np.array(temp[:split])
+        data['valid'] = np.array(temp[split:])
+
+        # Read BDB data into test set
+        for folder in ['test']:
+            path = os.path.join(path_bindingdb, folder)
+            proteinID, proteinSequence, aminoacidID, drugID, drugSMILES = self.get_info(path)
+            for type in ['edges.pos', 'edges.neg']:
+                print("\tReading "+type)
+                file = open(os.path.join(path, type), 'r')
+                for line in file.readlines():
+                    chem, dID, protein, pID = line.strip().split(',')
+
+                    pIndex = proteinID.index(pID) # Get index of protein ID
+                    aminoacids = proteinSequence[pIndex].split() # Get corresponding sequence of amino acid IDs
+                    protein = ''
+                    # Transform amino acid IDs to letters
+                    for i in range(len(aminoacids)):
+                        id = int(aminoacids[i])
+                        protein += aminoacidID[id]
+                    dIndex = drugID.index(dID)
+                    drug = drugSMILES[dIndex]
+
+                    if type == 'edges.neg':
+                        label = '0'
+                    else:
+                        label = '1'
+                    
+                    data['test'].append(np.array((drug, protein, int(label))))
+                file.close()
+        return data
+
+    def get_info(self, data_path):
+        files = [os.path.join(data_path, 'protein'), 
+                os.path.join(data_path, 'protein.repr'),
+                os.path.join(data_path, 'protein.vocab'),
+                os.path.join(data_path, 'chem'),
+                os.path.join(data_path, 'chem.repr')]
+        proteinID = [i.strip() for i in open(files[0], 'r').readlines()]
+        proteinSequence = [i.strip() for i in open(files[1], 'r').readlines()]
+        aminoacidID = [i.strip() for i in open(files[2], 'r').readlines()]
+        drugID = [i.strip() for i in open(files[3], 'r').readlines()]
+        drugSMILES = [i.strip() for i in open(files[4], 'r').readlines()]
+        return proteinID, proteinSequence, aminoacidID, drugID, drugSMILES
+
+    def create_embeddings(self):
+        '''
+        For all the proteins of the dataset, obtain the ELMO embeddings
+        for the sequences
+        '''
+        data = 'data'
+        path1 = os.path.join(data, 'embedding_files','prot_embedding_human.pkl')
+        path2 = os.path.join(data, 'embedding_files','prot_embedding_bindingDB.pkl')
+        with open(path1, 'rb') as f:
+            emb_dict = pkl.load(f)
+        with open(path2, 'rb') as f:
+            emb_dict2 = pkl.load(f)
+        emb_dict.update(emb_dict2)
+        id2emb = []
+        for protein in self.p2id.keys():
+            id2emb.append(emb_dict[protein])
+        return id2emb
+
+class Load_trainCElegans_testBDB(BaseLoader):
+    def load_data(self, data_path, valid_size=0.1):
+        print('\nReading the raw data...')
+
+        path_celegans = data_path[0]
+        path_bindingdb = data_path[1]
+
+        data = {'train': [], 'valid': [], 'test': []}
+
+        # Read Human data into training set
+        temp = []
+        file = open(os.path.join(path_celegans, 'data.txt'), 'r')
+        for line in file.readlines():
+            if line == '':
+                break
+            drug, protein, label = line.strip().split(' ')
+            temp.append(np.array((drug, protein, int(label))))
+        file.close()
+        # np.random.shuffle(temp)
+        samples = len(temp)
+        split = int((1 - valid_size) * samples)
+        data['train'] = np.array(temp[:split])
+        data['valid'] = np.array(temp[split:])
+
+        # Read BDB data into test set
+        for folder in ['test']:
+            path = os.path.join(path_bindingdb, folder)
+            proteinID, proteinSequence, aminoacidID, drugID, drugSMILES = self.get_info(path)
+            for type in ['edges.pos', 'edges.neg']:
+                print("\tReading "+type)
+                file = open(os.path.join(path, type), 'r')
+                for line in file.readlines():
+                    chem, dID, protein, pID = line.strip().split(',')
+
+                    pIndex = proteinID.index(pID) # Get index of protein ID
+                    aminoacids = proteinSequence[pIndex].split() # Get corresponding sequence of amino acid IDs
+                    protein = ''
+                    # Transform amino acid IDs to letters
+                    for i in range(len(aminoacids)):
+                        id = int(aminoacids[i])
+                        protein += aminoacidID[id]
+                    dIndex = drugID.index(dID)
+                    drug = drugSMILES[dIndex]
+
+                    if type == 'edges.neg':
+                        label = '0'
+                    else:
+                        label = '1'
+                    
+                    data['test'].append(np.array((drug, protein, int(label))))
+                file.close()
+        return data
+
+    def get_info(self, data_path):
+        files = [os.path.join(data_path, 'protein'), 
+                os.path.join(data_path, 'protein.repr'),
+                os.path.join(data_path, 'protein.vocab'),
+                os.path.join(data_path, 'chem'),
+                os.path.join(data_path, 'chem.repr')]
+        proteinID = [i.strip() for i in open(files[0], 'r').readlines()]
+        proteinSequence = [i.strip() for i in open(files[1], 'r').readlines()]
+        aminoacidID = [i.strip() for i in open(files[2], 'r').readlines()]
+        drugID = [i.strip() for i in open(files[3], 'r').readlines()]
+        drugSMILES = [i.strip() for i in open(files[4], 'r').readlines()]
+        return proteinID, proteinSequence, aminoacidID, drugID, drugSMILES
+
+    def create_embeddings(self):
+        '''
+        For all the proteins of the dataset, obtain the ELMO embeddings
+        for the sequences
+        '''
+        data = 'data'
+        path1 = os.path.join(data, 'embedding_files','prot_embedding_celegans.pkl')
+        path2 = os.path.join(data, 'embedding_files','prot_embedding_bindingDB.pkl')
+        with open(path1, 'rb') as f:
+            emb_dict = pkl.load(f)
+        with open(path2, 'rb') as f:
+            emb_dict2 = pkl.load(f)
+        emb_dict.update(emb_dict2)
+        id2emb = []
+        for protein in self.p2id.keys():
+            id2emb.append(emb_dict[protein])
+        return id2emb
+
+
+

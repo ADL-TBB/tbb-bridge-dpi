@@ -59,7 +59,7 @@ def train(method, data_class):
             cHiddenSizeList=[1024],
             fHiddenSizeList=[1024, 256],
             fSize=1024, cSize=data_class.pContFeat.shape[1],
-            gcnHiddenSizeList=[128,128], fcHiddenSizeList=[10], nodeNum=64,
+            gcnHiddenSizeList=[128,128], fcHiddenSizeList=[128], nodeNum=64,
             hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'), 
             useFeatures=useFeatures)
 
@@ -83,10 +83,12 @@ def test(model, data_class):
     return train_stats, valid_stats, test_stats
 
 
-experiments = [["bindingdb", "celegans"],
+experiments = [ ["bindingdb", "celegans"],
                 ["bindingdb", "human"],
                 ["human", "celegans"],
-                ["celegans", "human"]]
+                ["celegans", "human"],
+                ["human", "bindingdb"],
+                ["celegans", "bindingdb"] ]
 
 for experiment in experiments:
 
@@ -105,8 +107,14 @@ for experiment in experiments:
             elif experiment == ["human", "celegans"]:
                 data_class = Load_trainHuman_testCElegans(dataPath = [data_path_human, data_path_celegans])
             
-            else: # ["celegans", "human"]
+            elif experiment == ["celegans", "human"]:
                 data_class = Load_trainCElegans_testHuman(dataPath = [data_path_celegans, data_path_human])
+
+            elif experiment == ["human", "bindingdb"]:
+                data_class = Load_trainHuman_testBDB(dataPath = [data_path_human, data_path_bdb])
+
+            else: # ["celegans", "bindingdb"]
+                data_class = Load_trainCElegans_testBDB(dataPath = [data_path_celegans, data_path_bdb])
 
             model, useFeatures = train(method, data_class)
             train_res, valid_res, test_res = test(model, data_class)
