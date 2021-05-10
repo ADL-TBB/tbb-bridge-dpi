@@ -202,7 +202,7 @@ if __name__ == "__main__":
         chembl2aaseq = pkl.load(f)
 
     data = read_data(
-        data_path="C:/_msc/tbb-bridge-dpi/data/chembl/DEEPScreen_files/chembl27_preprocessed_filtered_act_inact_comps_10.0_20.0_blast_comp_0.2.txt",
+        data_path="chembl27_preprocessed_filtered_act_inact_comps_10.0_20.0_blast_comp_0.2.txt",
         chembl2smiles=chembl2smiles,
         chembl2aaseq=chembl2aaseq)
 
