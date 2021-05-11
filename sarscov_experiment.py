@@ -102,7 +102,7 @@ for experiment in experiments:
         avg_results /= repetitions
         results = np.array(avg_results).T # Transpose to get rows=drugs, columns=proteins
 
-        plt.figure(figsize=(10,10))
+        plt.figure(figsize=(12,12))
         ax = sns.heatmap(results, xticklabels=proteinnames, yticklabels=drugnames)
-        save_file = f"SARSCOV_{method}_{experiment}.pdf"
+        save_file = f"SARSCOV_{method}_{experiment}"
         plt.savefig(save_file)
