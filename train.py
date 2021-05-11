@@ -4,9 +4,11 @@ from DL_ClassifierModel import *
 import os
 from pathlib import Path
 
-# Choose dataset and modelfile name
-data = "bindingdb"
-save_path = "TEST_bindingdb"
+# Choose dataset
+data = Path(os.path.join("chembl", "chembl_partition_161k.pkl"))
+
+# Define filename to save model
+save_path = "ChEMBLpartition_pEmbedding"
 
 data_path = Path(os.path.join("data", data))
 assert data_path.exists(), "Download the necessary data from the following link: " \
@@ -14,10 +16,12 @@ assert data_path.exists(), "Download the necessary data from the following link:
 
 if data=="celegans" or data=="human":
     data_class = LoadCelegansHuman(dataPath=data_path)
-else: #bindingdb
+elif data=="bindingdb":
     data_class = LoadBindingDB(dataPath=data_path)
+else: # ChEMBL
+    data_class = LoadChEMBL(data_path)
 
-model = DTI_Bridge(outSize=128,
+model = p_Embedding_Bridge(outSize=128,
                   cHiddenSizeList=[1024],
                   fHiddenSizeList=[1024, 256],
                   fSize=1024, cSize=data_class.pContFeat.shape[1],
