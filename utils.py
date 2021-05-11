@@ -79,10 +79,10 @@ class BaseLoader():
             [i[:self.dSeqMaxLen] + [[0] * 75] * (self.dSeqMaxLen - len(i)) for i in self.dFeaData], dtype=np.int8)
         self.dFinprFeat = np.array(self.dFinData, dtype=np.float32)
         self.dSmilesData = np.array(self.dSmilesData)
-
+        '''
         self.vocab = WordVocab.load_vocab('data/smiles_trfm_model/vocab.pkl')
         self.ST_fingerprint = self.get_ST_features()
-
+        '''
         # Get the boolean vector of seen and unseen proteins
         self.pSeen = self.get_seen_proteins()
 
@@ -247,7 +247,7 @@ class BaseLoader():
             x_id.append(ids)
 
         return torch.tensor(x_id)
-
+    
     def get_ST_features(self):
         """
         Get Fingerprints from pretrained SMILES Transformer
@@ -258,7 +258,7 @@ class BaseLoader():
         ST_fingerprints = trfm.encode(torch.t(tokenized))
 
         return ST_fingerprints
-
+    
     def get_protein_kmer_features(self):
         '''
         Transform proteins into k-mer vectors.
@@ -346,9 +346,8 @@ class BaseLoader():
                       "pEmbeddings": torch.tensor(self.id2emb[pTokenizedNames], dtype=torch.float32).to(device),
                       "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.int8).to(device),
                       "pOnehot_unclipped": self.pOneHot_unclipped[pTokenizedNames],
-                      "dSmilesData": self.dSmilesData[dTokenizedNames],
-                      "ST_fingerprint": torch.tensor(self.ST_fingerprint[dTokenizedNames], dtype=torch.float32).to(
-                          device)
+                    #   "ST_fingerprint": torch.tensor(self.ST_fingerprint[dTokenizedNames], dtype=torch.float32).to(device),
+                      "dSmilesData": self.dSmilesData[dTokenizedNames]
                   }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
 
     def random_batch_data_stream(self, batchSize=32, type='train', device=torch.device('cpu')):
@@ -373,9 +372,8 @@ class BaseLoader():
                           "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.int8).to(device),
                           "pEmbeddings": torch.tensor(self.id2emb[pTokenizedNames], dtype=torch.float32).to(device),
                           "pOnehot_unclipped":self.pOneHot_unclipped[pTokenizedNames],
-                          "dSmilesData":self.dSmilesData[dTokenizedNames],
-                          "ST_fingerprint": torch.tensor(self.ST_fingerprint[dTokenizedNames], dtype=torch.float32).to(
-                              device)
+                        #   "ST_fingerprint": torch.tensor(self.ST_fingerprint[dTokenizedNames], dtype=torch.float32).to(device),
+                          "dSmilesData":self.dSmilesData[dTokenizedNames]
                       }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
  
     def unshuffled_data_stream(self, batchSize=32, type='test', device=torch.device('cpu')):
@@ -397,9 +395,8 @@ class BaseLoader():
                       "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.int8).to(device),
                       "pEmbeddings": torch.tensor(self.id2emb[pTokenizedNames], dtype=torch.float32).to(device),
                       "pOnehot_unclipped": self.pOneHot_unclipped[pTokenizedNames],
-                      "dSmilesData": self.dSmilesData[dTokenizedNames],
-                      "ST_fingerprint": torch.tensor(self.ST_fingerprint[dTokenizedNames], dtype=torch.float32).to(
-                          device)
+                    #   "ST_fingerprint": torch.tensor(self.ST_fingerprint[dTokenizedNames], dtype=torch.float32).to(device),
+                      "dSmilesData": self.dSmilesData[dTokenizedNames]
                   }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
 
 
@@ -462,7 +459,6 @@ class LoadBindingDB(BaseLoader):
         drugSMILES = [i.strip() for i in open(files[4], 'r').readlines()]
         return proteinID, proteinSequence, aminoacidID, drugID, drugSMILES   
 
-
     def create_embeddings(self):
         '''
         For all the proteins of the dataset, obtain the ELMO embeddings
@@ -523,27 +519,72 @@ class LoadCelegansHuman(BaseLoader):
             id2emb.append(emb_dict[protein])
         return id2emb
 
+class LoadChEMBL(BaseLoader):
+    def load_data(self, data_path, valid_size=0.1, test_size=0.1):
+        '''
+        Define in chembl_set which dataset (.pkl file) has to be read
+        Read file and return data as list of [drug, protein, label]
+        '''
+        print(f'\nReading the raw data (from {data_path})...')
+        temp = []
+        with open(data_path, 'rb') as f:
+            temp = pkl.load(f)
+        print(f"Length of dataset: {len(temp)}")
+        data = self.create_sets(temp, valid_size, test_size)
+        return data
+
+    def create_sets(self, temp, valid_size, test_size):
+        np.random.shuffle(temp)
+        data = {'train': [], 'valid': [], 'test': []}
+        samples = len(temp)
+        split1 = int((1 - valid_size - test_size) * samples)
+        split2 = int((1 - test_size) * samples)
+        data['train'] = temp[:split1]
+        data['valid'] = temp[split1:split2]
+        data['test'] = temp[split2:]
+        return data
+    
+    def create_embeddings(self):
+        '''
+        Import the ELMO protein embeddings for either human of c.elegans dataset
+        '''
+        data = 'data'
+        path = os.path.join(data, 'embedding_files','prot_embedding_chembl.pkl')
+        emb_file = open(path, 'rb')
+        emb_dict = pkl.load(emb_file)
+        emb_file.close()
+        id2emb = []
+        for protein in self.p2id.keys():
+            id2emb.append(emb_dict[protein])
+        return id2emb
 
 
-
+# Classes for SARS-CoV-2 case study
 class LoadSarscov2_with_Celegans(BaseLoader):
-    def load_data(self, data_path):
+    def load_data(self, data_path, valid_size=0.1):
         print('\nReading the raw data...')
+
+        celegans_path = data_path[0]
+        sarscov_path = data_path[1]
 
         data = {'train': [], 'valid': [], 'test': []}
 
         temp = []
-        file = open(os.path.join('data\\celegans', 'data.txt'), 'r')
+        file = open(os.path.join(celegans_path, 'data.txt'), 'r')
         for line in file.readlines():
             if line == '':
                 break
             drug, protein, label = line.strip().split(' ')
             temp.append(np.array((drug, protein, int(label))))
         file.close()
-        data['train'] = np.array(temp)
+        # np.random.shuffle(temp)
+        samples = len(temp)
+        split = int((1 - valid_size) * samples)
+        data['train'] = temp[:split]
+        data['valid'] = temp[split:]
 
         temp = []
-        file = open(os.path.join(data_path, 'data.txt'), 'r')
+        file = open(os.path.join(sarscov_path, 'data.txt'), 'r')
         for line in file.readlines():
             if line == '':
                 break
@@ -553,25 +594,50 @@ class LoadSarscov2_with_Celegans(BaseLoader):
         data['test'] = np.array(temp)
 
         return data
+
+    def create_embeddings(self):
+        '''
+        For all the proteins of the dataset, obtain the ELMO embeddings
+        for the sequences
+        '''
+        data = 'data'
+        path1 = os.path.join(data, 'embedding_files','prot_embedding_celegans.pkl')
+        path2 = os.path.join(data, 'embedding_files','prot_embedding_sarscov.pkl')
+        with open(path1, 'rb') as f:
+            emb_dict = pkl.load(f)
+        with open(path2, 'rb') as f:
+            emb_dict2 = pkl.load(f)
+        emb_dict.update(emb_dict2)
+        id2emb = []
+        for protein in self.p2id.keys():
+            id2emb.append(emb_dict[protein])
+        return id2emb
 
 class LoadSarscov2_with_Human(BaseLoader):
-    def load_data(self, data_path):
+    def load_data(self, data_path, valid_size=0.1):
         print('\nReading the raw data...')
+        
+        human_path = data_path[0]
+        sarscov_path = data_path[1]
 
         data = {'train': [], 'valid': [], 'test': []}
 
         temp = []
-        file = open(os.path.join('data\\human', 'data.txt'), 'r')
+        file = open(os.path.join(human_path, 'data.txt'), 'r')
         for line in file.readlines():
             if line == '':
                 break
             drug, protein, label = line.strip().split(' ')
             temp.append(np.array((drug, protein, int(label))))
         file.close()
-        data['train'] = np.array(temp)
+        # np.random.shuffle(temp)
+        samples = len(temp)
+        split = int((1 - valid_size) * samples)
+        data['train'] = temp[:split]
+        data['valid'] = temp[split:]
 
         temp = []
-        file = open(os.path.join(data_path, 'data.txt'), 'r')
+        file = open(os.path.join(sarscov_path, 'data.txt'), 'r')
         for line in file.readlines():
             if line == '':
                 break
@@ -581,16 +647,37 @@ class LoadSarscov2_with_Human(BaseLoader):
         data['test'] = np.array(temp)
 
         return data
+
+    def create_embeddings(self):
+        '''
+        For all the proteins of the dataset, obtain the ELMO embeddings
+        for the sequences
+        '''
+        data = 'data'
+        path1 = os.path.join(data, 'embedding_files','prot_embedding_human.pkl')
+        path2 = os.path.join(data, 'embedding_files','prot_embedding_sarscov.pkl')
+        with open(path1, 'rb') as f:
+            emb_dict = pkl.load(f)
+        with open(path2, 'rb') as f:
+            emb_dict2 = pkl.load(f)
+        emb_dict.update(emb_dict2)
+        id2emb = []
+        for protein in self.p2id.keys():
+            id2emb.append(emb_dict[protein])
+        return id2emb
 
 class LoadSarscov2_with_BindingDB(BaseLoader):
     def load_data(self, data_path):
         print('\nReading the raw data...')
 
+        bindingdb_path = data_path[0]
+        sarscov_path = data_path[1]
+
         data = {'train': [], 'valid': [], 'test': []}
 
         for folder in ['train', 'dev', 'test']:
             print("\tOpened "+folder)
-            path = os.path.join("data\\bindingdb", folder)
+            path = os.path.join(bindingdb_path, folder)
             proteinID, proteinSequence, aminoacidID, drugID, drugSMILES = self.get_info(path)
 
             for type in ['edges.pos', 'edges.neg']:
@@ -613,11 +700,14 @@ class LoadSarscov2_with_BindingDB(BaseLoader):
                         label = '0'
                     else:
                         label = '1'
-                    data['train'].append(np.array((drug, protein, int(label))))
+                    if folder=='dev':
+                        data['valid'].append(np.array((drug, protein, int(label))))
+                    else: # Add both training and test set to training data
+                        data['train'].append(np.array((drug, protein, int(label))))
                 file.close()
         
         temp = []
-        file = open(os.path.join(data_path, 'data.txt'), 'r')
+        file = open(os.path.join(sarscov_path, 'data.txt'), 'r')
         for line in file.readlines():
             if line == '':
                 break
@@ -648,9 +738,26 @@ class LoadSarscov2_with_BindingDB(BaseLoader):
         drugSMILES = [i.strip() for i in open(files[4], 'r').readlines()]
         return proteinID, proteinSequence, aminoacidID, drugID, drugSMILES
 
+    def create_embeddings(self):
+        '''
+        For all the proteins of the dataset, obtain the ELMO embeddings
+        for the sequences
+        '''
+        data = 'data'
+        path1 = os.path.join(data, 'embedding_files','prot_embedding_bindingDB.pkl')
+        path2 = os.path.join(data, 'embedding_files','prot_embedding_sarscov.pkl')
+        with open(path1, 'rb') as f:
+            emb_dict = pkl.load(f)
+        with open(path2, 'rb') as f:
+            emb_dict2 = pkl.load(f)
+        emb_dict.update(emb_dict2)
+        id2emb = []
+        for protein in self.p2id.keys():
+            id2emb.append(emb_dict[protein])
+        return id2emb
 
 
-
+# Classes to load data for cross-dataset experiments
 class Load_trainBDB_testCElegans(BaseLoader):
     def load_data(self, data_path):    
         print('\nReading the raw data...')
