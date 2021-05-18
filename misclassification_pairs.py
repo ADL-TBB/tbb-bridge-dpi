@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import torch
 
+#Select the dataset and the path/pickle file where the data will be saved
 dataset = "bindingdb" # celegans / human / bindingdb
 model_path = "TEST_binding_db"
 model = 'DTI_bridge'
@@ -14,6 +15,7 @@ dump_file = "misclass_pEmbeddings"
 
 data_path = Path(os.path.join("data", dataset))
 
+#Create the data class
 if dataset=='celegans' or dataset=='human':
     data_class = LoadCelegansHuman(dataPath=data_path)
 else: #bindingdb
@@ -21,6 +23,7 @@ else: #bindingdb
 
 data_class = LoadBindingDB(dataPath=data_path)
 
+#Create the model
 if model == 'DTI_bridge':
     model = DTI_Bridge(outSize=128,
                    cHiddenSizeList=[1024],
@@ -41,29 +44,35 @@ else:
 model.load(path=model_path, map_location="cuda", dataClass=data_class)
 model.to_eval_mode()
 
-def seen_stats(data, seen_data, Y_heavi, Y):
-    n_seen = np.sum(seen_data)
-    n_unseen = data.shape[0] - n_seen
-    seen_correct = 0
-    unseen_correct = 0
-    for i in range(data.shape[0]):
-        if Y_heavi[i] == Y[i]:
-            if seen_data[i]:
-                seen_correct += 1
-            else:
-                unseen_correct += 1
-    return n_seen, n_unseen, seen_correct, unseen_correct
 
 def get_miscl():
+    #Get test set
     test = np.array(data_class.eSeqData['test'])
+    
+    #Predict on it
+    print(len(test))
     Ypre, Y, _ = model.calculate_y_with_seenbool(data_class.one_epoch_batch_data_stream(batchSize=128, type='test', device=torch.device('cuda')))
+    
+    #Transform the probability predictions to 0 and 1
     Y_heavi = np.where(Ypre>=0.5, 1, 0)
+    print(len(Y_heavi))
     pred_bool = np.where(Y_heavi != Y)
     examples_misclass = test[pred_bool]
-    misclass_couples = [(data_class.id2p[miscl[0]], data_class.id2p[miscl[1]]) for miscl in examples_misclass]
-
+    classes_misclass = Y[pred_bool]
+    
+    test_names = [(data_class.id2p[example[0]], data_class.id2d[example[1]]) for example in test] #all examples from test set
+    misclass_couples = [(data_class.id2p[miscl[0]], data_class.id2d[miscl[1]]) for miscl in examples_misclass] #all examples from misclassified test
+    dNames_misclass = [data_class.drug_names[miscl[1]] for miscl in examples_misclass] #drug names misclassified example
+    drugs_test = [data_class.drug_names[ex[1]] for ex in test] #drug names of the whole test set 
+    
+    #Save test set and drug names 
+    test_set_file = open('test.pkl', 'wb')
+    pkl.dump([test_names, dNames_misclass, drugs_test] , test_set_file)
+    test_set_file.close()
+    
+    #Save misclassified examples
     misclass_file = open(dump_file, 'wb')
-    pkl.dump(misclass_couples, misclass_file)
+    pkl.dump([misclass_couples, classes_misclass], misclass_file)
     misclass_file.close()
 
     length_proteins = []

@@ -6,7 +6,7 @@ from pathlib import Path
 
 # Choose dataset and modelfile name
 data = "bindingdb"
-save_path = "TEST_bindingdb"
+save_path = "dummy"
 
 data_path = Path(os.path.join("data", data))
 assert data_path.exists(), "Download the necessary data from the following link: " \
@@ -17,12 +17,13 @@ if data=="celegans" or data=="human":
 else: #bindingdb
     data_class = LoadBindingDB(dataPath=data_path)
 
-model = DTI_Bridge(outSize=128,
+model = p_Emb_ST_Bridge(outSize=256,
                   cHiddenSizeList=[1024],
-                  fHiddenSizeList=[1024, 256],
+                  fHiddenSizeList=[1024, 512],
                   fSize=1024, cSize=data_class.pContFeat.shape[1],
-                  gcnHiddenSizeList=[128, 128], fcHiddenSizeList=[128], nodeNum=64,
-                  hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'))
+                  gcnHiddenSizeList=[256, 256], fcHiddenSizeList=[256], nodeNum=256,
+                  hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'), useFeatures={"pEmbeddings": True, "kmers": False, "pSeq": False,
+                   "FP": False, "dSeq": False, "ST_fingerprint": True})
 
 model.train(data_class, trainSize=512, batchSize=512, epoch=128,
             stopRounds=-1, earlyStop=30,

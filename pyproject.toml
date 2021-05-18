@@ -11,21 +11,17 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.7, <4.0"
+python = ">=3.7"
 scipy = "^1.6.1"
 tqdm = "^4.58.0"
 tables = "^3.6.1"
-tensorflow = "^2.3"
+tensorflow = "^2.4.1"
 scikit-learn = "^0.24.1"
+torch = {version = "^1.7.1", python = "^3.7"}
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.2"
-poethepoet = "^0.10.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.poe.tasks]
-get-gxx = "conda install -c anaconda gxx_linux-64"
-get-torch-cuda = "conda install pytorch torchvision torchaudio cudatoolkit=11.1 -c pytorch -c conda-forge"
