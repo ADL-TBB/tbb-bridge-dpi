@@ -16,7 +16,7 @@ from smiles_transformer.build_vocab import WordVocab
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
 
-class BaseLoader():
+class BaseLoader:
     def __init__(self, dataPath, device='cuda', pSeqMaxLen=1024, dSeqMaxLen=128, kmers=-1, seed=42):
         np.random.seed(seed)
         self.device = device
@@ -24,7 +24,13 @@ class BaseLoader():
         self.dataPath = dataPath
         self.pSeqMaxLen = pSeqMaxLen
         self.dSeqMaxLen = dSeqMaxLen
+        self._create_features()
 
+    def _create_features(self):
+        # TODO: add methods that just load the features for the respective models: baseline, etc
+        #  or with if statements with feature lists
+        # TODO: add no_split to if else statements in loading of features
+        # TODO: call customized methods in train and predict subclasses
         # These data will be filled with append values in the methods called
         # down below.
         self.p2id, self.id2p = {}, []
@@ -646,3 +652,68 @@ class LoadSarscov2_with_BindingDB(BaseLoader):
         drugSMILES = [i.strip() for i in open(files[4], 'r').readlines()]
         return proteinID, proteinSequence, aminoacidID, drugID, drugSMILES
 
+
+class PredictInteractions(BaseLoader):
+    def __init__(self, data_path, device):
+        self.data_path = data_path
+        self.device = device
+        self.records = self.load_data()
+        self.emb_dict = self.open_embeddings()
+        super(BaseLoader, self).__init__()
+        self._create_features()
+
+    def load_data(self):
+        records = []
+        file = open(os.path.join(self.data_path, 'data.txt'), 'r')
+        for line in file.readlines():
+            if line == '':
+                break
+            protein, drug, label = line.strip().split('\t')
+            records.append([drug, protein, int(label)])
+        file.close()
+        return records
+
+    def _create_features(self):
+        embs = []
+        dFinData = []
+        for record in self.records:
+            drug, protein, label = record
+            # print(drug, drug, label)
+            tmp = np.ones((1,))
+            mol = Chem.MolFromSmiles(drug)
+            DataStructs.ConvertToNumpyArray(AllChem.GetHashedMorganFingerprint(mol, 2, nBits=1024), tmp)
+            dFinData.append(tmp)
+            print(type(self.emb_dict))
+            embs.append(self.emb_dict[protein])
+
+        self.id2emb = torch.stack(embs)
+        self.dFinprFeat = np.array(dFinData, dtype=np.float32)
+
+    def open_embeddings(self):
+        '''
+        For all the proteins of the dataset, obtain the ELMO embeddings
+        for the sequences
+        '''
+        data = 'data'
+        path = os.path.join(data, 'embedding_files','prot_embedding_mtb.pkl')
+        emb_file = open(path, 'rb')
+        emb_dict = pkl.load(emb_file)
+        emb_file.close()
+        return emb_dict
+
+    def yield_batch(self):
+        device = self.device
+        samples = self.records
+        yield {
+                  "res": True,
+                  # "aminoCtr": torch.tensor(self.pContFeat[pTokenizedNames], dtype=torch.float32).to(device),
+                  # "pSeqLen": torch.tensor(self.pSeqLen[pTokenizedNames], dtype=torch.int32).to(device),
+                  # "atomFea": torch.tensor(self.dGraphFeat[dTokenizedNames], dtype=torch.float32).to(device),
+                  "atomFin": torch.tensor(self.dFinprFeat, dtype=torch.float32).to(device),
+                  # "atomSeq": torch.tensor(self.dSeqTokenized, dtype=torch.long).to(device),
+                  "pEmbeddings": torch.tensor(self.id2emb, dtype=torch.float32).to(device),
+                  # "ST_fingerprint": torch.tensor(self.ST_fingerprint[dTokenizedNames], dtype=torch.float32).to(
+                  #     device)
+              }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
+        # Ypre, Y = model.calculate_y_prob_by_iterator(
+            # dataClass.one_epoch_batch_data_stream(batchSize=128, type='test', device=torch.device('cpu')))

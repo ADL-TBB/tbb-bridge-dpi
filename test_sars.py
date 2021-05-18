@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 
 avg_results = np.zeros((12,12))
 
+# TODO: test new predict method with sars cov (for new model only)
+
 # Choose data and model
 dataset = "sarscov2" # celegans / human / bindingdb
 
