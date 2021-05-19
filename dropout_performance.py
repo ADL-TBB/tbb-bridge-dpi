@@ -42,8 +42,8 @@ data_class = LoadBindingDB(dataPath=data_path)
 test = np.array(data_class.eSeqData['test'])
 
 #Iterate on the separate possible methods
-for dropout in [0.4]:
-    for method in ['DTI_Bridge']:
+for dropout in [0.0,0.1,0.2,0.3,0.4]:
+    for method in ['DTI_Bridge','p_Embedding_Bridge']:
         save_path = f"bindingdb_DO_{dropout}_model_{method}"
         if method == 'DTI_Bridge':
             for (kmers, pSeq) in [(True, True)]:
@@ -85,7 +85,7 @@ for dropout in [0.4]:
                     write_to_file(dropout, useFeatures, train_mean, valid_mean, test_mean, save_path)
 
         elif method == 'p_Embedding_Bridge':
-            for (FP, dSeq) in [(False, True)]:
+            for (FP, dSeq) in [(True, False)]:
                     pEmbeddings = True
                     ST_fingerprint = False
                     kmers = False 

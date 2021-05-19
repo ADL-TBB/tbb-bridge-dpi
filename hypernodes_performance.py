@@ -38,9 +38,8 @@ data_class = LoadBindingDB(dataPath=data_path)
 test = np.array(data_class.eSeqData['test'])
 
 #Iterate on the separate possible methods
-for number_of_graph_nodes in [256]:
+for number_of_graph_nodes in [128]:
     for method in ['DTI_Bridge', 'p_Embedding_Bridge']:
-        
         save_path = f"bindingdb_hypern_{number_of_graph_nodes}_model_{method}"
         if method == 'DTI_Bridge':
             for (kmers, pSeq) in [(True, True)]:
@@ -61,7 +60,7 @@ for number_of_graph_nodes in [256]:
                             fHiddenSizeList=[1024, 256],
                             fSize=1024, cSize=data_class.pContFeat.shape[1],
                             gcnHiddenSizeList=[128,128], fcHiddenSizeList=[128], nodeNum=number_of_graph_nodes,
-                            hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'), 
+                            dropout=0.5, hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'), 
                             useFeatures=useFeatures)
                         model.train(data_class, trainSize=512, batchSize=512, epoch=128,
                             stopRounds=-1, earlyStop=30,
@@ -81,7 +80,7 @@ for number_of_graph_nodes in [256]:
                     log(number_of_graph_nodes, useFeatures, train_mean, valid_mean, test_mean)
 
         elif method == 'p_Embedding_Bridge':
-            for (FP, dSeq) in [(False, True)]:
+            for (FP, dSeq) in [(True, False)]:
                     pEmbeddings = True
                     ST_fingerprint = False
                     kmers = False 
@@ -98,7 +97,7 @@ for number_of_graph_nodes in [256]:
                             fHiddenSizeList=[1024, 256],
                             fSize=1024, cSize=data_class.pContFeat.shape[1],
                             gcnHiddenSizeList=[128,128], fcHiddenSizeList=[128], nodeNum=number_of_graph_nodes,
-                            hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'), 
+                            dropout=0.5, hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'), 
                             useFeatures=useFeatures)
                         model.train(data_class, trainSize=512, batchSize=512, epoch=128,
                             stopRounds=-1, earlyStop=30,
