@@ -7,19 +7,26 @@ import os
 from pathlib import Path
 import torch
 
-log_file = 'results_combination_of_models.log'
+log_file = 'dropout.log'
 log_format = '%(asctime)s : %(levelname)s : %(message)s'
 logging.basicConfig(format=log_format, filename = log_file, level=logging.DEBUG)
 logger = logging.getLogger()
 
 def log(fc_dropout, setting, training_data, valid_data, test_data):
     logger.debug(f'Conditions --> fc_dropout: {fc_dropout}, pEmbeddings: {setting["pEmbeddings"]}, kmers: {setting["kmers"]}, pSeq: {setting["pSeq"]}, FP: {setting["FP"]}, dSeq: {setting["dSeq"]}, ST_fingerprint: {setting["ST_fingerprint"]}\n')
-    logger.info(f'Training --> AUC = {training_data[0]}, ACC = {training_data[1]}\n')
-    logger.info(f'Validation --> AUC = {valid_data[0]}, ACC = {valid_data[1]}\n')
-    logger.info(f'Test --> AUC = {test_data[0]}, ACC = {test_data[1]}\n')
+    logger.info(f'Training --> ACC = {training_data[0]}, AUC = {training_data[1]}\n')
+    logger.info(f'Validation --> ACC = {valid_data[0]}, AUC = {valid_data[1]}\n')
+    logger.info(f'Test --> ACC = {test_data[0]}, AUC = {test_data[1]}\n')
     logger.info('\n')
 
-
+def write_to_file(fc_dropout, setting, training_data, valid_data, test_data, save_path):
+    file = open(f"{save_path}.txt","a") 
+    file.write(f'Conditions --> fc_dropout: {fc_dropout}, pEmbeddings: {setting["pEmbeddings"]}, kmers: {setting["kmers"]}, pSeq: {setting["pSeq"]}, FP: {setting["FP"]}, dSeq: {setting["dSeq"]}, ST_fingerprint: {setting["ST_fingerprint"]}\n')
+    file.write(f'Training --> ACC = {training_data[0]}, AUC = {training_data[1]}\n')
+    file.write(f'Validation --> ACC = {valid_data[0]}, AUC = {valid_data[1]}\n')
+    file.write(f'Test --> ACC = {test_data[0]}, AUC = {test_data[1]}\n')
+    file.write('\n')
+    file.close()
 
 #Training data binding DB
 data = "bindingdb"
@@ -35,8 +42,8 @@ data_class = LoadBindingDB(dataPath=data_path)
 test = np.array(data_class.eSeqData['test'])
 
 #Iterate on the separate possible methods
-for dropout in [0, 0.2, 0.3, 0.4, 0.5]:
-    for method in ['DTI_Bridge', 'p_Embedding_Bridge']:
+for dropout in [0.4]:
+    for method in ['DTI_Bridge']:
         save_path = f"bindingdb_DO_{dropout}_model_{method}"
         if method == 'DTI_Bridge':
             for (kmers, pSeq) in [(True, True)]:
@@ -57,7 +64,7 @@ for dropout in [0, 0.2, 0.3, 0.4, 0.5]:
                             fHiddenSizeList=[1024, 256],
                             fSize=1024, cSize=data_class.pContFeat.shape[1],
                             gcnHiddenSizeList=[128,128], fcHiddenSizeList=[128], nodeNum=64,
-                            hdnDropout=dropout, fcDropout=0.2, device=torch.device('cuda'), 
+                            dropout=dropout, hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'), 
                             useFeatures=useFeatures)
                         model.train(data_class, trainSize=512, batchSize=512, epoch=128,
                             stopRounds=-1, earlyStop=30,
@@ -75,6 +82,7 @@ for dropout in [0, 0.2, 0.3, 0.4, 0.5]:
                     valid_mean = np.mean(np.array(valid_stats), axis = 0)
                     test_mean = np.mean(np.array(test_stats), axis = 0)
                     log(dropout, useFeatures, train_mean, valid_mean, test_mean)
+                    write_to_file(dropout, useFeatures, train_mean, valid_mean, test_mean, save_path)
 
         elif method == 'p_Embedding_Bridge':
             for (FP, dSeq) in [(False, True)]:
@@ -94,7 +102,7 @@ for dropout in [0, 0.2, 0.3, 0.4, 0.5]:
                             fHiddenSizeList=[1024, 256],
                             fSize=1024, cSize=data_class.pContFeat.shape[1],
                             gcnHiddenSizeList=[128,128], fcHiddenSizeList=[128], nodeNum=64,
-                            hdnDropout=dropout, fcDropout=0.2, device=torch.device('cuda'), 
+                            dropout=dropout, hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'), 
                             useFeatures=useFeatures)
                         model.train(data_class, trainSize=512, batchSize=512, epoch=128,
                             stopRounds=-1, earlyStop=30,
@@ -112,7 +120,7 @@ for dropout in [0, 0.2, 0.3, 0.4, 0.5]:
                     valid_mean = np.mean(np.array(valid_stats), axis = 0)
                     test_mean = np.mean(np.array(test_stats), axis = 0)
                     log(dropout, useFeatures, train_mean, valid_mean, test_mean)
-        
+                    write_to_file(dropout, useFeatures, train_mean, valid_mean, test_mean, save_path)
 
 
 

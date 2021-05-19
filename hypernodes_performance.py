@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 import torch
 
+torch.cuda.empty_cache()
+
 log_file = 'results_combination_of_models.log'
 log_format = '%(asctime)s : %(levelname)s : %(message)s'
 logging.basicConfig(format=log_format, filename = log_file, level=logging.DEBUG)
@@ -36,12 +38,13 @@ data_class = LoadBindingDB(dataPath=data_path)
 test = np.array(data_class.eSeqData['test'])
 
 #Iterate on the separate possible methods
-for number_of_graph_nodes in [[64,64],[256,256]]:
+for number_of_graph_nodes in [256]:
     for method in ['DTI_Bridge', 'p_Embedding_Bridge']:
-        save_path = f"bindingdb_hypern_{number_of_graph_nodes[0]}_{number_of_graph_nodes[1]}_model_{method}"
+        
+        save_path = f"bindingdb_hypern_{number_of_graph_nodes}_model_{method}"
         if method == 'DTI_Bridge':
             for (kmers, pSeq) in [(True, True)]:
-                for (FP, dSeq) in [(True, True)]:
+                for (FP, dSeq) in [(True, False)]:
                     if (kmers, pSeq, FP, dSeq) == (False, False, False, False):
                         break
                     pEmbeddings = False
@@ -57,7 +60,7 @@ for number_of_graph_nodes in [[64,64],[256,256]]:
                             cHiddenSizeList=[1024],
                             fHiddenSizeList=[1024, 256],
                             fSize=1024, cSize=data_class.pContFeat.shape[1],
-                            gcnHiddenSizeList=number_of_graph_nodes, fcHiddenSizeList=[128], nodeNum=64,
+                            gcnHiddenSizeList=[128,128], fcHiddenSizeList=[128], nodeNum=number_of_graph_nodes,
                             hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'), 
                             useFeatures=useFeatures)
                         model.train(data_class, trainSize=512, batchSize=512, epoch=128,
@@ -94,7 +97,7 @@ for number_of_graph_nodes in [[64,64],[256,256]]:
                             cHiddenSizeList=[1024],
                             fHiddenSizeList=[1024, 256],
                             fSize=1024, cSize=data_class.pContFeat.shape[1],
-                            gcnHiddenSizeList=number_of_graph_nodes, fcHiddenSizeList=[128], nodeNum=64,
+                            gcnHiddenSizeList=[128,128], fcHiddenSizeList=[128], nodeNum=number_of_graph_nodes,
                             hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'), 
                             useFeatures=useFeatures)
                         model.train(data_class, trainSize=512, batchSize=512, epoch=128,

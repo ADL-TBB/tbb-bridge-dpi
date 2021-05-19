@@ -356,7 +356,7 @@ class Parent_Bridge(BaseClassifier):
                  fHiddenSizeList,
                  fSize, cSize,
                  gcnHiddenSizeList, fcHiddenSizeList, nodeNum, resnet,
-                 hdnDropout, fcDropout, device,
+                 dropout, hdnDropout, fcDropout, device,
                  useFeatures,
                  maskDTI):
         
@@ -364,11 +364,11 @@ class Parent_Bridge(BaseClassifier):
             nodeNum, 0), outSize)), dtype=torch.float32), dropout=hdnDropout, name='nodeEmbedding').to(device)
 
         self.amEmbedding = TextEmbedding(
-            torch.eye(24), dropout=hdnDropout, freeze=True, name='amEmbedding').to(device)
+            torch.eye(24), dropout=dropout, freeze=True, name='amEmbedding').to(device)
         self.pCNN = TextCNN(24, 64, [25], ln=True, name='pCNN').to(device)
 
         self.dCNN = TextCNN(75, 64, [7], ln=True, name='dCNN').to(device)
-        self.dFcLinear = MLP(64, outSize, dropout=hdnDropout, bnEveryLayer=True,
+        self.dFcLinear = MLP(64, outSize, dropout=dropout, bnEveryLayer=True,
                              dpEveryLayer=True, outBn=True, outAct=True, outDp=True, name='dFcLinear').to(device)
         
         self.nodeGCN = GCN(outSize, outSize, gcnHiddenSizeList, name='nodeGCN', dropout=hdnDropout,
@@ -444,7 +444,7 @@ class DTI_Bridge(Parent_Bridge):
                  fHiddenSizeList,
                  fSize=1024, cSize=8422,
                  gcnHiddenSizeList=[], fcHiddenSizeList=[], nodeNum=32, resnet=True,
-                 hdnDropout=0.1, fcDropout=0.2, device=torch.device('cuda'),
+                 dropout=0.5, hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'),
                  useFeatures={"pEmbeddings": False, "kmers": True, "pSeq": True,
                               "FP": True, "dSeq": True, "ST_fingerprint": False},
                  maskDTI=False):
@@ -454,18 +454,18 @@ class DTI_Bridge(Parent_Bridge):
                  fHiddenSizeList,
                  fSize, cSize,
                  gcnHiddenSizeList, fcHiddenSizeList, nodeNum, resnet,
-                 hdnDropout, fcDropout, device,
+                 dropout, hdnDropout, fcDropout, device,
                  useFeatures,
                  maskDTI)
         
         self.fFcLinear = MLP(fSize, outSize, fHiddenSizeList, outAct=True, name='fFcLinear',
-                             dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
+                             dropout=dropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
             device)
         self.cFcLinear = MLP(cSize, outSize, cHiddenSizeList, outAct=True, name='cFcLinear',
-                             dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
+                             dropout=dropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
             device)
         
-        self.pFcLinear = MLP(64, outSize, dropout=hdnDropout, bnEveryLayer=True,
+        self.pFcLinear = MLP(64, outSize, dropout=dropout, bnEveryLayer=True,
                              dpEveryLayer=True, outBn=True, outAct=True, outDp=True, name='pFcLinear').to(device)
 
         self.moduleList = nn.ModuleList(
@@ -478,7 +478,7 @@ class ST_Bridge(Parent_Bridge):
                  fHiddenSizeList,
                  fSize=1024, cSize=8422,
                  gcnHiddenSizeList=[], fcHiddenSizeList=[], nodeNum=32, resnet=True,
-                 hdnDropout=0.1, fcDropout=0.2, device=torch.device('cuda'),
+                 dropout=0.5, hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'),
                  useFeatures={"pEmbeddings": False, "kmers": True, "pSeq": True,
                      "FP": True, "dSeq": True, "ST_fingerprint": True},
                  maskDTI=False):
@@ -488,19 +488,19 @@ class ST_Bridge(Parent_Bridge):
                  fHiddenSizeList,
                  fSize, cSize,
                  gcnHiddenSizeList, fcHiddenSizeList, nodeNum, resnet,
-                 hdnDropout, fcDropout, device,
+                 dropout, hdnDropout, fcDropout, device,
                  useFeatures,
                  maskDTI)
 
         self.STLinear = MLP(fSize, outSize, fHiddenSizeList, outAct=True, name='STLinear',
-                            dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
+                            dropout=dropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
                             device) # altered MLP layer for SMILES transformer
 
         self.cFcLinear = MLP(cSize, outSize, cHiddenSizeList, outAct=True, name='cFcLinear',
-                             dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
+                             dropout=dropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
             device)
         
-        self.pFcLinear = MLP(64, outSize, dropout=hdnDropout, bnEveryLayer=True,
+        self.pFcLinear = MLP(64, outSize, dropout=dropout, bnEveryLayer=True,
                              dpEveryLayer=True, outBn=True, outAct=True, outDp=True, name='pFcLinear').to(device)
 
         self.moduleList = nn.ModuleList(
@@ -513,7 +513,7 @@ class p_Embedding_Bridge(Parent_Bridge):
                  fHiddenSizeList,
                  fSize=1024, cSize=8422,
                  gcnHiddenSizeList=[], fcHiddenSizeList=[], nodeNum=32, resnet=True,
-                 hdnDropout=0.1, fcDropout=0.2, device=torch.device('cuda'),
+                 dropout=0.5, hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'),
                  useFeatures={"pEmbeddings": True, "kmers": False, "pSeq": True,
                               "FP": True, "dSeq": True, "ST_fingerprint": False},
                  maskDTI=False):
@@ -523,15 +523,15 @@ class p_Embedding_Bridge(Parent_Bridge):
                  fHiddenSizeList,
                  fSize, cSize,
                  gcnHiddenSizeList, fcHiddenSizeList, nodeNum, resnet,
-                 hdnDropout, fcDropout, device,
+                 dropout, hdnDropout, fcDropout, device,
                  useFeatures,
                  maskDTI)
 
         self.p_emb_pFcLinear = MLP(fSize, outSize, fHiddenSizeList, outAct=True, name='p_emb_pFcLinear',
-                             dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(device)
+                             dropout=dropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(device)
 
         self.fFcLinear = MLP(fSize, outSize, fHiddenSizeList, outAct=True, name='fFcLinear',
-                             dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
+                             dropout=dropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
             device)
 
         self.moduleList = nn.ModuleList([self.nodeEmbedding, self.fFcLinear, self.nodeGCN, self.fcLinear, self.p_emb_pFcLinear, self.dCNN, self.dFcLinear])
@@ -542,7 +542,7 @@ class p_Emb_ST_Bridge(Parent_Bridge):
                  fHiddenSizeList,
                  fSize=1024, cSize=8422,
                  gcnHiddenSizeList=[], fcHiddenSizeList=[], nodeNum=32, resnet=True,
-                 hdnDropout=0.1, fcDropout=0.2, device=torch.device('cuda'),
+                 dropout=0.5, hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'),
                  useFeatures={"pEmbeddings": True, "kmers": False, "pSeq": True,
                               "FP": True, "dSeq": True, "ST_fingerprint": True},
                  maskDTI=False):
@@ -552,16 +552,16 @@ class p_Emb_ST_Bridge(Parent_Bridge):
                  fHiddenSizeList,
                  fSize, cSize,
                  gcnHiddenSizeList, fcHiddenSizeList, nodeNum, resnet,
-                 hdnDropout, fcDropout, device,
+                 dropout, hdnDropout, fcDropout, device,
                  useFeatures,
                  maskDTI)
         
         self.STLinear = MLP(fSize, outSize, fHiddenSizeList, outAct=True, name='STLinear',
-                            dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
+                            dropout=dropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(
                             device) # altered MLP layer for SMILES transformer
     
         self.p_emb_pFcLinear = MLP(fSize, outSize, fHiddenSizeList, outAct=True, name='p_emb_pFcLinear',
-                             dropout=hdnDropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(device)
+                             dropout=dropout, dpEveryLayer=True, outDp=True, bnEveryLayer=True, outBn=True).to(device)
 
         self.moduleList = nn.ModuleList([self.nodeEmbedding, self.STLinear, self.nodeGCN, self.fcLinear, 
             self.p_emb_pFcLinear])
