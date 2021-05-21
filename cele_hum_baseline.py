@@ -63,7 +63,7 @@ for data in ["celegans", "human"]:
                            gcnHiddenSizeList=[128, 128], fcHiddenSizeList=[128], nodeNum=64,
                            hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'),
                            useFeatures=useFeatures)
-        model.train(data_class, trainSize=512, batchSize=512, epoch=128,
+        model.cv_train(data_class, trainSize=512, batchSize=512, epoch=128,
                     stopRounds=-1, earlyStop=30,
                     savePath=save_path, metrics="AUC", report=["ACC", "AUC", "LOSS"],
                     preheat=0)
