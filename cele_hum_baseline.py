@@ -7,36 +7,33 @@ import os
 from pathlib import Path
 import torch
 
-log_file = 'baseline.log'
+log_file = 'cele_hum_baseline.log'
 log_format = '%(asctime)s : %(levelname)s : %(message)s'
-fhandler = logging.FileHandler(filename='baseline.log', mode='a')
+fhandler = logging.FileHandler(filename=log_file, mode='a')
 logging.basicConfig(format=log_format, filename=log_file,  level=logging.DEBUG)
 
 logger = logging.getLogger()
 logger.addHandler(fhandler)
 
 def log(data, setting, training_data, valid_data, test_data):
-    logger.debug(f'Data: {data}, Conditions --> pEmbeddings: {setting["pEmbeddings"]}, kmers: {setting["kmers"]}, pSeq: {setting["pSeq"]}, FP: {setting["FP"]}, dSeq: {setting["dSeq"]}, ST_fingerprint: {setting["ST_fingerprint"]}\n')
-    logger.info(f'Training --> AUC = {training_data[0]}, ACC = {training_data[1]}\n')
-    logger.info(f'Validation --> AUC = {valid_data[0]}, ACC = {valid_data[1]}\n')
-    logger.info(f'Test --> AUC = {test_data[0]}, ACC = {test_data[1]}\n')
+    logger.info(f'Averaged results')
+    logger.info(f'Data: {data}, Conditions --> pEmbeddings: {setting["pEmbeddings"]}, kmers: {setting["kmers"]}, pSeq: {setting["pSeq"]}, FP: {setting["FP"]}, dSeq: {setting["dSeq"]}, ST_fingerprint: {setting["ST_fingerprint"]}\n')
+    logger.info(f'Training --> AUC = {training_data[1]}, ACC = {training_data[0]}\n')
+    logger.info(f'Validation --> AUC = {valid_data[1]}, ACC = {valid_data[0]}\n')
+    logger.info(f'Test --> AUC = {test_data[1]}, ACC = {test_data[0]}\n')
     logger.info('\n')
 
 def log_per_iteration(data, setting, train, valid, test):
-    logger.debug(f'single iteration')
-    logger.debug(f'Data: {data}, Conditions --> pEmbeddings: {setting["pEmbeddings"]}, kmers: {setting["kmers"]}, pSeq: {setting["pSeq"]}, FP: {setting["FP"]}, dSeq: {setting["dSeq"]}, ST_fingerprint: {setting["ST_fingerprint"]}\n')
-    logger.info(f'Training --> AUC = {train[0]}, ACC = {train[1]}\n')
-    logger.info(f'Validation --> AUC = {valid[0]}, ACC = {valid[1]}\n')
-    logger.info(f'Test --> AUC = {test[0]}, ACC = {test[1]}\n')
+    logger.info(f'Single iteration')
+    logger.info(f'Data: {data}, Conditions --> pEmbeddings: {setting["pEmbeddings"]}, kmers: {setting["kmers"]}, pSeq: {setting["pSeq"]}, FP: {setting["FP"]}, dSeq: {setting["dSeq"]}, ST_fingerprint: {setting["ST_fingerprint"]}\n')
+    logger.info(f'Training --> AUC = {train[1]}, ACC = {train[0]}\n')
+    logger.info(f'Validation --> AUC = {valid[1]}, ACC = {valid[0]}\n')
+    logger.info(f'Test --> AUC = {test[1]}, ACC = {test[0]}\n')
     logger.info('\n')
 
 
 
 #Training data binding DB
-data = "celegans"
-# data = "human"
-
-
 
 for data in ["celegans", "human"]:
 

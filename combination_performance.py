@@ -9,14 +9,15 @@ import torch
 
 log_file = 'results_combination_of_models.log'
 log_format = '%(asctime)s : %(levelname)s : %(message)s'
+fhandler = logging.FileHandler(filename=log_file, mode='a')
 logging.basicConfig(format=log_format, filename = log_file, level=logging.DEBUG)
 logger = logging.getLogger()
 
 def log(setting, training_data, valid_data, test_data):
     logger.debug(f'Conditions --> pEmbeddings: {setting["pEmbeddings"]}, kmers: {setting["kmers"]}, pSeq: {setting["pSeq"]}, FP: {setting["FP"]}, dSeq: {setting["dSeq"]}, ST_fingerprint: {setting["ST_fingerprint"]}\n')
-    logger.info(f'Training --> AUC = {training_data[0]}, ACC = {training_data[1]}\n')
-    logger.info(f'Validation --> AUC = {valid_data[0]}, ACC = {valid_data[1]}\n')
-    logger.info(f'Test --> AUC = {test_data[0]}, ACC = {test_data[1]}\n')
+    logger.info(f'Training --> AUC = {training_data[1]}, ACC = {training_data[0]}\n')
+    logger.info(f'Validation --> AUC = {valid_data[1]}, ACC = {valid_data[0]}\n')
+    logger.info(f'Test --> AUC = {test_data[1]}, ACC = {test_data[0]}\n')
     logger.info('\n')
 
 
