@@ -59,6 +59,16 @@ class Metrictor:
               "".join([f"{np.mean([res[i] for res in resList]):>8.3f}" for i in report]))
         print("======" + "========"*len(report))
 
+    @staticmethod
+    def cv_average_results(results, report):
+        # [f"{np.mean([res[i] for res in resList]):>8.3f}" for i in report]
+
+        avg_cv = {'train': {}, 'valid': {}}
+        for subset in ['train', 'valid']:
+            for met in report:
+                avg_cv[subset][met] = [np.mean([res[met] for res in subset])]
+        return avg_cv
+
     def each_class_indictor_show(self, id2lab):
         print('Waiting for finishing...')
 

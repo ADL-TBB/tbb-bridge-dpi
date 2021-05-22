@@ -30,6 +30,7 @@ class BaseClassifier:
         data = np.concatenate((dataClass.eSeqData['train'], dataClass.eSeqData['valid']))
 
         results = []
+        results_train_val = {'train': [], 'test': []}
         for i, (train_index, test_index) in enumerate(skf.split(data)):
             dataClass.eSeqData['train'] = data[train_index]
             dataClass.eSeqData['valid'] = data[test_index]
@@ -45,11 +46,16 @@ class BaseClassifier:
                              preheat, lr1, lr2, momentum, weightDecay,
                              isHigherBetter, metrics, report, f"{savePath}_cv{i + 1}")
             results.append(res)
+            results_train_val['train'].append(self.final_res['training'])
+            results_train_val['valid'].append(self.final_res['valid'])
+
         Metrictor.table_show(results, report)
         if dataClass.testSampleNum > 0:
             print("(Results on test set)")
         else:
             print("(Results on validation set)")
+
+        return Metrictor.cv_average_results(results_train_val, report)
         
     def cv_train_by_protein(self, dataClass, trainSize=256, batchSize=256, epoch=100, stopRounds=10, earlyStop=10,
                             saveRounds=1,
@@ -95,7 +101,7 @@ class BaseClassifier:
               metrics="AUC", report=["ACC", "AUC"],
               savePath='model'):
         
-        self.final_res = {'training':[], 'valid':[]}
+        self.final_res = {'training': {m: [] for m in report}, 'valid': {m: [] for m in report}}
         assert batchSize % trainSize == 0
         metrictor = Metrictor()
         self.stepCounter = 0
@@ -193,17 +199,17 @@ class BaseClassifier:
         Y_pre, Y = self.calculate_y_prob_by_iterator(dataClass.one_epoch_batch_data_stream(
             trainSize, type='train', device=self.device))
         metrictor.set_data(Y_pre, Y)
-        metrictor(report)
-        self.final_res['training'].append(metrictor.ACC())
-        self.final_res['training'].append(metrictor.AUC())
+        res = metrictor(report)
+
+        self.final_res['training'] = res
 
         print(f'[Total Valid]', end='')
         Y_pre, Y = self.calculate_y_prob_by_iterator(dataClass.one_epoch_batch_data_stream(
             trainSize, type='valid', device=self.device))
         metrictor.set_data(Y_pre, Y)
         res = metrictor(report)
-        self.final_res['valid'].append(metrictor.ACC())
-        self.final_res['valid'].append(metrictor.AUC())
+
+        self.final_res['valid'] = res
 
         if dataClass.testSampleNum > 0:
             print(f'[Total Test]', end='')
