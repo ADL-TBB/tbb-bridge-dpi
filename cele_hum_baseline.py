@@ -17,18 +17,24 @@ logger.addHandler(fhandler)
 
 def log(data, setting, training_data, valid_data, test_data):
     logger.info(f'Averaged results')
-    logger.info(f'Data: {data}, Conditions --> pEmbeddings: {setting["pEmbeddings"]}, kmers: {setting["kmers"]}, pSeq: {setting["pSeq"]}, FP: {setting["FP"]}, dSeq: {setting["dSeq"]}, ST_fingerprint: {setting["ST_fingerprint"]}\n')
-    logger.info(f'Training --> AUC = {training_data[1]}, ACC = {training_data[0]}\n')
-    logger.info(f'Validation --> AUC = {valid_data[1]}, ACC = {valid_data[0]}\n')
-    logger.info(f'Test --> AUC = {test_data[1]}, ACC = {test_data[0]}\n')
+    logger.info(f'Data: {data}, Conditions --> pEmbeddings: {setting["pEmbeddings"]}, kmers: {setting["kmers"]}, '
+                f'pSeq: {setting["pSeq"]}, FP: {setting["FP"]}, dSeq: {setting["dSeq"]}, ST_fingerprint: {setting["ST_fingerprint"]}\n')
+    logger.info(f'Training --> AUC = {format(training_data[1], ".3f")}, ACC = {format(training_data[0], ".3f")}, '
+                f'Precision = {format(training_data[2], ".3f")}, Recall = {format(training_data[3], ".3f")}, F1 = {format(training_data[4], ".3f")}\n')
+    logger.info(f'Validation --> AUC = {format(valid_data[1], ".3f")}, ACC = {format(valid_data[0], ".3f")}, '
+                f'Precision = {format(valid_data[2], ".3f")}, Recall = {format(valid_data[3], ".3f")}, '
+                f'F1 = {format(valid_data[4], ".3f")}\n')
+    logger.info(f'Test --> AUC = {format(test_data[1], ".3f")}, ACC = {format(test_data[0], ".3f")}, '
+                f'Precision = {format(test_data[2], ".3f")}, Recall = {format(test_data[3], ".3f")}, F1 = {format(test_data[4], ".3f")}\n')
     logger.info('\n')
 
 def log_per_iteration(data, setting, train, valid, test):
     logger.info(f'Single iteration')
-    logger.info(f'Data: {data}, Conditions --> pEmbeddings: {setting["pEmbeddings"]}, kmers: {setting["kmers"]}, pSeq: {setting["pSeq"]}, FP: {setting["FP"]}, dSeq: {setting["dSeq"]}, ST_fingerprint: {setting["ST_fingerprint"]}\n')
-    logger.info(f'Training --> AUC = {train[1]}, ACC = {train[0]}\n')
-    logger.info(f'Validation --> AUC = {valid[1]}, ACC = {valid[0]}\n')
-    logger.info(f'Test --> AUC = {test[1]}, ACC = {test[0]}\n')
+    logger.info(f'Data: {data}, Conditions --> pEmbeddings: {setting["pEmbeddings"]}, kmers: {setting["kmers"]}, '
+                f'pSeq: {setting["pSeq"]}, FP: {setting["FP"]}, dSeq: {setting["dSeq"]}, ST_fingerprint: {setting["ST_fingerprint"]}\n')
+    logger.info(f'Training --> AUC = {train[1]}, ACC = {train[0]}, Precision = {train[2]}, Recall = {train[3]}, F1 = {train[4]}\n')
+    logger.info(f'Validation --> AUC = {valid[1]}, ACC = {valid[0]}, Precision = {valid[2]}, Recall = {valid[3]}, F1 = {valid[4]}\n')
+    logger.info(f'Test --> AUC = {test[1]}, ACC = {test[0]}, Precision = {test[2]}, Recall = {test[3]}, F1 = {test[4]}\n')
     logger.info('\n')
 
 
@@ -65,7 +71,7 @@ for data in ["celegans", "human"]:
                            useFeatures=useFeatures)
         model.cv_train(data_class, trainSize=512, batchSize=512, epoch=128,
                     stopRounds=-1, earlyStop=30,
-                    savePath=save_path, metrics="AUC", report=["ACC", "AUC", "LOSS"],
+                    savePath=save_path, metrics="AUC", report=["ACC", "AUC", "LOSS", "Precision", "Recall", "F1"],
                     preheat=0)
         train_stats.append(model.final_res['training'])
         valid_stats.append(model.final_res['valid'])
@@ -75,9 +81,10 @@ for data in ["celegans", "human"]:
             data_class.one_epoch_batch_data_stream(batchSize=128, type='test', device=torch.device('cuda')))
         metrictor = Metrictor()
         metrictor.set_data(Ypre, Y)
-        test_stats.append([metrictor.ACC(), metrictor.AUC()])
+        test_stats.append([metrictor.ACC(), metrictor.AUC(), metrictor.Precision(), metrictor.Recall(), metrictor.F1()])
 
-        log_per_iteration(data, useFeatures, model.final_res['training'], model.final_res['valid'], [metrictor.ACC(), metrictor.AUC()])
+        log_per_iteration(data, useFeatures, model.final_res['training'], model.final_res['valid'],
+                          [metrictor.ACC(), metrictor.AUC(), metrictor.Precision(), metrictor.Recall(), metrictor.F1()])
         print(f'done iteration {iter} on test {data}')
 
     train_mean = np.mean(np.array(train_stats), axis=0)
