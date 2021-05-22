@@ -69,13 +69,16 @@ for data in ["celegans", "human"]:
                            gcnHiddenSizeList=[128, 128], fcHiddenSizeList=[128], nodeNum=64,
                            hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'),
                            useFeatures=useFeatures)
-        model.cv_train(data_class, trainSize=512, batchSize=512, epoch=128,
+        avg_results = model.cv_train(data_class, trainSize=512, batchSize=512, epoch=128,
                     stopRounds=-1, earlyStop=30,
                     savePath=save_path, metrics="AUC", report=["ACC", "AUC", "LOSS", "Precision", "Recall", "F1"],
                     preheat=0)
-        train_stats.append(model.final_res['training'])
-        valid_stats.append(model.final_res['valid'])
-        # Get test results
+        # train_stats.append(model.final_res['training'])
+        # valid_stats.append(model.final_res['valid'])
+        train_stats.append(avg_results['train'])
+        valid_stats.append(avg_results['valid'])
+
+        # # Get test results
         model.to_eval_mode()
         Ypre, Y, seenbool = model.calculate_y_with_seenbool(
             data_class.one_epoch_batch_data_stream(batchSize=128, type='test', device=torch.device('cuda')))
@@ -91,4 +94,5 @@ for data in ["celegans", "human"]:
     valid_mean = np.mean(np.array(valid_stats), axis=0)
     test_mean = np.mean(np.array(test_stats), axis=0)
     log(data, useFeatures, train_mean, valid_mean, test_mean)
+
 
