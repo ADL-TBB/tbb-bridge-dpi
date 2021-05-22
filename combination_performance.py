@@ -12,6 +12,7 @@ log_format = '%(asctime)s : %(levelname)s : %(message)s'
 fhandler = logging.FileHandler(filename=log_file, mode='a')
 logging.basicConfig(format=log_format, filename = log_file, level=logging.DEBUG)
 logger = logging.getLogger()
+logger.addHandler(fhandler)
 
 def log(setting, training_data, valid_data, test_data):
     logger.debug(f'Conditions --> pEmbeddings: {setting["pEmbeddings"]}, kmers: {setting["kmers"]}, pSeq: {setting["pSeq"]}, FP: {setting["FP"]}, dSeq: {setting["dSeq"]}, ST_fingerprint: {setting["ST_fingerprint"]}\n')
@@ -19,8 +20,6 @@ def log(setting, training_data, valid_data, test_data):
     logger.info(f'Validation --> AUC = {valid_data[1]}, ACC = {valid_data[0]}\n')
     logger.info(f'Test --> AUC = {test_data[1]}, ACC = {test_data[0]}\n')
     logger.info('\n')
-
-
 
 #Training data binding DB
 data = "bindingdb"

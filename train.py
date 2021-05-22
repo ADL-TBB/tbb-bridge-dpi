@@ -1,8 +1,18 @@
 # Initialize connection with rest of lib
+# TODO: add logging to all scripts (train.py, utils.py, DL_Classifier.py)
 from utils import *
 from DL_ClassifierModel import *
-import os
+import os, sys
 from pathlib import Path
+import logging
+
+if sys.argv[1]:
+    log_file = os.path.join(sys.argv[1], 'basic_logger.log')
+else:
+    log_file = 'basic_logger.log'
+
+log_format = '%(asctime)s : %(levelname)s : %(message)s'
+logging.basicConfig(format=log_format, filename=log_file,  level=logging.DEBUG, filemode='a')
 
 # Choose dataset and modelfile name
 data = "bindingdb"
@@ -28,9 +38,3 @@ model.train(data_class, trainSize=512, batchSize=512, epoch=128,
             stopRounds=-1, earlyStop=30,
             savePath=save_path, metrics="AUC", report=["ACC", "AUC", "LOSS"],
             preheat=0)
-'''
-model.cv_train(data_class, trainSize=512, batchSize=512, epoch=128,
-            stopRounds=-1, earlyStop=30,
-            savePath=save_path, metrics="AUC", report=["ACC", "AUC", "LOSS"],
-            preheat=0)
-'''

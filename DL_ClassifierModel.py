@@ -2,12 +2,15 @@ import numpy as np
 import torch
 import time
 import os
+import logging
 from torch import nn as nn
 from nnLayer import *
 from metrics import *
 from sklearn.model_selection import KFold
 from torch.backends import cudnn
 from Others import *
+
+logger = logging.getLogger(__name__) # child logger from train.py
 
 
 class BaseClassifier:

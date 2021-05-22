@@ -6,15 +6,16 @@ from rdkit.Chem import AllChem
 from rdkit import DataStructs
 from pathlib import Path
 import pickle as pkl
-#Transform strings into vectors of elements and onehot encode their presence/absence in a certain string
+# Transform strings into vectors of elements and onehot encode their presence/absence in a certain string
 from sklearn.feature_extraction.text import CountVectorizer
 sys.path.insert(0, 'smiles_transformer')
 
 from smiles_transformer.pretrain_trfm import TrfmSeq2seq
 from smiles_transformer.build_vocab import WordVocab
 
-logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+# logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
+logger = logging.getLogger(__name__) # child logger from train.py
 
 class BaseLoader():
     def __init__(self, dataPath, device='cuda', pSeqMaxLen=1024, dSeqMaxLen=128, kmers=-1, seed=42):
