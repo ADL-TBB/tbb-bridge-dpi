@@ -175,8 +175,8 @@ for method in ['DTI_Bridge', 'ST_Bridge', 'p_Embedding_Bridge', 'p_Emb_ST_Bridge
                 stopRounds=-1, earlyStop=30,
                 savePath=save_path, metrics="AUC", report=["ACC", "AUC", "LOSS"],
                 preheat=0)
-            train_stats.append(model.final_res['training'])
-            valid_stats.append(model.final_res['valid'])
+            train_stats.extend([model.final_res['training']['ACC'], model.final_res['training']['AUC']])
+            valid_stats.extend([model.final_res['valid']['ACC'], model.final_res['valied']['AUC']])
             #Get test results
             model.to_eval_mode()
             Ypre, Y, seenbool = model.calculate_y_with_seenbool(data_class.one_epoch_batch_data_stream(batchSize=128, type='test', device=torch.device('cuda')))
