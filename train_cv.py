@@ -43,7 +43,7 @@ data_path = Path(os.path.join("data", data))
 assert data_path.exists()
 
 # Get the human/celegans class
-data_class = LoadCelegansHuman(dataPath=data_path)
+data_class = LoadCelegansHuman(dataPath=data_path, device=torch.device('cuda'))
 
 # Set up the test set
 test = np.array(data_class.eSeqData['test'])
