@@ -71,17 +71,14 @@ for data in ["celegans", "human"]:
         avg_results = model.cv_train(data_class, trainSize=512, batchSize=512, epoch=128,
                     stopRounds=-1, earlyStop=30,
                     savePath=save_path, metrics="AUC", report=report,
-                    preheat=0)
-        # train_stats.append(model.final_res['training'])
-        # valid_stats.append(model.final_res['valid'])
-        # train_stats.append(avg_results['train'])
-        # valid_stats.append(avg_results['valid'])
+                    preheat=0, kFold=5)
+
         iteration_train = []
         iteration_valid = []
-        for subset in ['train', 'valid']:
-            for met in report:
-                iteration_train.append(avg_results['train'][met])
-                iteration_valid.append(avg_results['valid'][met])
+
+        for met in report:
+            iteration_train.append(avg_results['train'][met])
+            iteration_valid.append(avg_results['valid'][met])
         train_stats.append(iteration_train)
         valid_stats.append(iteration_valid)
 

@@ -68,14 +68,12 @@ for iter in range(2):
                                  savePath=save_path, metrics="AUC",
                                  report=report,
                                  preheat=0)
-    # train_stats.append(model.final_res['training'])
-    # valid_stats.append(model.final_res['valid'])
+
     iteration_train = []
     iteration_valid = []
-    for subset in ['train', 'valid']:
-        for met in report:
-            iteration_train.append(avg_results['train'][met])
-            iteration_valid.append(avg_results['valid'][met])
+    for met in report:
+        iteration_train.append(avg_results['train'][met])
+        iteration_valid.append(avg_results['valid'][met])
     train_stats.append(iteration_train)
     valid_stats.append(iteration_valid)
 
