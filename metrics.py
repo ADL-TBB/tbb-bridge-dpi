@@ -66,7 +66,7 @@ class Metrictor:
         avg_cv = {'train': {}, 'valid': {}}
         for subset in ['train', 'valid']:
             for met in report:
-                avg_cv[subset][met] = [np.mean([res[met] for res in results])]
+                avg_cv[subset][met] = [np.mean([results[subset][i][met] for i in results[subset]])]
         return avg_cv
 
     def each_class_indictor_show(self, id2lab):
