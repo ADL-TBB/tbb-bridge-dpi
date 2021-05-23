@@ -5,6 +5,7 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit import DataStructs
 from pathlib import Path
+from copy import deepcopy
 import pickle as pkl
 #Transform strings into vectors of elements and onehot encode their presence/absence in a certain string
 from sklearn.feature_extraction.text import CountVectorizer
@@ -94,6 +95,22 @@ class BaseLoader:
         # Get one-hot encoded proteins, i.e. for every protein a 2D array [pSeqMaxLen, n_aminoacids]
         self.pOnehot = self.get_onehot_proteins()
         self.pOneHot_unclipped = self.get_onehot_proteins_unclipped()
+
+        self.batch_dict = {
+                      "aminoSeq": torch.tensor(self.pSeqTokenized, dtype=torch.float32),
+                      "aminoCtr": torch.tensor(self.pContFeat, dtype=torch.float32),
+                      "pSeqLen": torch.tensor(self.pSeqLen, dtype=torch.int32),
+                      "atomFea": torch.tensor(self.dGraphFeat, dtype=torch.float32),
+                      "atomFin": torch.tensor(self.dFinprFeat, dtype=torch.float32),
+                      "atomSeq": torch.tensor(self.dSeqTokenized, dtype=torch.float32),
+                      "dSeqLen": torch.tensor(self.dSeqLen, dtype=torch.int32),
+                      "seenbool": torch.tensor(self.pSeen, dtype=torch.bool),
+                      "pEmbeddings": torch.tensor(self.id2emb, dtype=torch.float32),
+                      "pOnehot": torch.tensor(self.pOnehot, dtype=torch.int8),
+                      "ST_fingerprint": torch.tensor(self.ST_fingerprint, dtype=torch.float32)
+                  }
+        self.protein_feats = ["aminoseq", "aminoCtr", "SeqLen", "seenbool", "pEmbeddings", "pOnehot"]
+        self.drug_feats = ["atomFea", "atomFin", "atomSeq", "dSeqLen", "ST_fingerprint"]
 
         print("Done\n")
 
@@ -329,6 +346,9 @@ class BaseLoader:
             pList.append(pOneHot)
         return np.array(pList, dtype=np.object)
 
+    def retrieve_batch(self):
+        pass
+
     def one_epoch_batch_data_stream(self, batchSize=32, type='valid', device=torch.device('cpu')):
         edges = self.eSeqData[type]
         indexes = np.arange(len(edges))
@@ -337,24 +357,16 @@ class BaseLoader:
         for i in range((len(edges) + batchSize - 1) // batchSize):
             samples = edges[i * batchSize:(i + 1) * batchSize]
             pTokenizedNames, dTokenizedNames = [i[0] for i in samples], [i[1] for i in samples]
+            batch_dict = deepcopy(self.batch_dict)
 
-            yield {
-                      "res": True,
-                      "aminoSeq": torch.tensor(self.pSeqTokenized[pTokenizedNames], dtype=torch.long).to(device),
-                      "aminoCtr": torch.tensor(self.pContFeat[pTokenizedNames], dtype=torch.float32).to(device),
-                      "pSeqLen": torch.tensor(self.pSeqLen[pTokenizedNames], dtype=torch.int32).to(device),
-                      "atomFea": torch.tensor(self.dGraphFeat[dTokenizedNames], dtype=torch.float32).to(device),
-                      "atomFin": torch.tensor(self.dFinprFeat[dTokenizedNames], dtype=torch.float32).to(device),
-                      "atomSeq": torch.tensor(self.dSeqTokenized[dTokenizedNames], dtype=torch.long).to(device),
-                      "dSeqLen": torch.tensor(self.dSeqLen[dTokenizedNames], dtype=torch.int32).to(device),
-                      "seenbool": torch.tensor(self.pSeen[pTokenizedNames], dtype=torch.bool).to(device),
-                      "pEmbeddings": torch.tensor(self.id2emb[pTokenizedNames], dtype=torch.float32).to(device),
-                      "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.int8).to(device),
-                      "pOnehot_unclipped": self.pOneHot_unclipped[pTokenizedNames],
-                      "dSmilesData": self.dSmilesData[dTokenizedNames],
-                      "ST_fingerprint": torch.tensor(self.ST_fingerprint[dTokenizedNames], dtype=torch.float32).to(
-                          device)
-                  }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
+            for feat in batch_dict.keys():
+                if feat in self.protein_feats:
+                    batch_dict[feat] = batch_dict[feat][pTokenizedNames].to(device)
+                elif feat in self.drug_feats:
+                    batch_dict[feat] = batch_dict[feat][dTokenizedNames].to(device)
+
+            batch_dict['res'] = True
+            yield batch_dict, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
 
     def random_batch_data_stream(self, batchSize=32, type='train', device=torch.device('cpu')):
         edges = [i for i in self.eSeqData[type]]
@@ -363,49 +375,32 @@ class BaseLoader:
             for i in range((len(edges) + batchSize - 1) // batchSize):
                 samples = edges[i * batchSize:(i + 1) * batchSize]
                 pTokenizedNames, dTokenizedNames = [i[0] for i in samples], [i[1] for i in samples]
+                batch_dict = deepcopy(self.batch_dict)
 
-                yield {
-                          "res": True,
-                          "aminoSeq": torch.tensor(self.pSeqTokenized[pTokenizedNames], dtype=torch.long).to(
-                              device),
-                          "aminoCtr": torch.tensor(self.pContFeat[pTokenizedNames], dtype=torch.float32).to(device),
-                          "pSeqLen": torch.tensor(self.pSeqLen[pTokenizedNames], dtype=torch.int32).to(device),
-                          "atomFea": torch.tensor(self.dGraphFeat[dTokenizedNames], dtype=torch.float32).to(device),
-                          "atomFin": torch.tensor(self.dFinprFeat[dTokenizedNames], dtype=torch.float32).to(device),
-                          "atomSeq": torch.tensor(self.dSeqTokenized[dTokenizedNames], dtype=torch.long).to(device),
-                          "dSeqLen": torch.tensor(self.dSeqLen[dTokenizedNames], dtype=torch.int32).to(device),
-                          "seenbool": torch.tensor(self.pSeen[pTokenizedNames], dtype=torch.bool).to(device),
-                          "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.int8).to(device),
-                          "pEmbeddings": torch.tensor(self.id2emb[pTokenizedNames], dtype=torch.float32).to(device),
-                          "pOnehot_unclipped":self.pOneHot_unclipped[pTokenizedNames],
-                          "dSmilesData":self.dSmilesData[dTokenizedNames],
-                          "ST_fingerprint": torch.tensor(self.ST_fingerprint[dTokenizedNames], dtype=torch.float32).to(
-                              device)
-                      }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
+                for feat in batch_dict.keys():
+                    if feat in self.protein_feats:
+                        batch_dict[feat] = batch_dict[feat][pTokenizedNames].to(device)
+                    elif feat in self.drug_feats:
+                        batch_dict[feat] = batch_dict[feat][dTokenizedNames].to(device)
+
+                batch_dict['res'] = True
+                yield batch_dict, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
  
     def unshuffled_data_stream(self, batchSize=32, type='test', device=torch.device('cpu')):
         edges = self.eSeqData[type]
         for i in range((len(edges) + batchSize - 1) // batchSize):
             samples = edges[i * batchSize:(i + 1) * batchSize]
             pTokenizedNames, dTokenizedNames = [i[0] for i in samples], [i[1] for i in samples]
-           
-            yield {
-                      "res": True,
-                      "aminoSeq": torch.tensor(self.pSeqTokenized[pTokenizedNames], dtype=torch.long).to(device),
-                      "aminoCtr": torch.tensor(self.pContFeat[pTokenizedNames], dtype=torch.float32).to(device),
-                      "pSeqLen": torch.tensor(self.pSeqLen[pTokenizedNames], dtype=torch.int32).to(device),
-                      "atomFea": torch.tensor(self.dGraphFeat[dTokenizedNames], dtype=torch.float32).to(device),
-                      "atomFin": torch.tensor(self.dFinprFeat[dTokenizedNames], dtype=torch.float32).to(device),
-                      "atomSeq": torch.tensor(self.dSeqTokenized[dTokenizedNames], dtype=torch.long).to(device),
-                      "dSeqLen": torch.tensor(self.dSeqLen[dTokenizedNames], dtype=torch.int32).to(device),
-                      "seenbool": torch.tensor(self.pSeen[pTokenizedNames], dtype=torch.bool).to(device),
-                      "pOnehot": torch.tensor(self.pOnehot[pTokenizedNames], dtype=torch.int8).to(device),
-                      "pEmbeddings": torch.tensor(self.id2emb[pTokenizedNames], dtype=torch.float32).to(device),
-                      "pOnehot_unclipped": self.pOneHot_unclipped[pTokenizedNames],
-                      "dSmilesData": self.dSmilesData[dTokenizedNames],
-                      "ST_fingerprint": torch.tensor(self.ST_fingerprint[dTokenizedNames], dtype=torch.float32).to(
-                          device)
-                  }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
+            batch_dict = deepcopy(self.batch_dict)
+
+            for feat in batch_dict.keys():
+                if feat in self.protein_feats:
+                    batch_dict[feat] = batch_dict[feat][pTokenizedNames].to(device)
+                elif feat in self.drug_feats:
+                    batch_dict[feat] = batch_dict[feat][dTokenizedNames].to(device)
+
+            batch_dict['res'] = True
+            yield batch_dict, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
 
 
 class LoadBindingDB(BaseLoader):
@@ -520,6 +515,51 @@ class LoadCelegansHuman(BaseLoader):
             path = os.path.join(data, 'embedding_files','prot_embedding_human.pkl')
         else:
             path = os.path.join(data, 'embedding_files','prot_embedding_celegans.pkl')
+        emb_file = open(path, 'rb')
+        emb_dict = pkl.load(emb_file)
+        emb_file.close()
+        id2emb = []
+        for protein in self.p2id.keys():
+            id2emb.append(emb_dict[protein])
+        return id2emb
+
+class L(BaseLoader):
+    def load_data(self, data_path, valid_size=0.1, test_size=0.1):
+        '''
+        Read file and return data as list of [drug, protein, label]
+        '''
+        print('\nReading the raw data...')
+        temp = []
+        file = open(os.path.join(data_path, 'data.txt'), 'r')
+        for line in file.readlines():
+            if line == '':
+                break
+            drug, protein, label = line.strip().split(' ')
+            temp.append(np.array((drug, protein, int(label))))
+        file.close()
+        data = self.create_sets(temp, valid_size, test_size)
+        return data
+
+    def create_sets(self, temp, valid_size, test_size):
+        np.random.shuffle(temp)
+        data = {'train': [], 'valid': [], 'test': []}
+        samples = len(temp)
+        split1 = int((1 - valid_size - test_size) * samples)
+        split2 = int((1 - test_size) * samples)
+        data['train'] = temp[:split1]
+        data['valid'] = temp[split1:split2]
+        data['test'] = temp[split2:]
+        return data
+
+    def create_embeddings(self):
+        '''
+        Import the ELMO protein embeddings for either human of c.elegans dataset
+        '''
+        data = 'data'
+        if 'human' in str(self.dataPath):
+            path = os.path.join(data, 'embedding_files', 'prot_embedding_human.pkl')
+        else:
+            path = os.path.join(data, 'embedding_files', 'prot_embedding_celegans.pkl')
         emb_file = open(path, 'rb')
         emb_dict = pkl.load(emb_file)
         emb_file.close()
@@ -706,14 +746,7 @@ class PredictInteractions(BaseLoader):
         samples = self.records
         yield {
                   "res": True,
-                  # "aminoCtr": torch.tensor(self.pContFeat[pTokenizedNames], dtype=torch.float32).to(device),
-                  # "pSeqLen": torch.tensor(self.pSeqLen[pTokenizedNames], dtype=torch.int32).to(device),
-                  # "atomFea": torch.tensor(self.dGraphFeat[dTokenizedNames], dtype=torch.float32).to(device),
                   "atomFin": torch.tensor(self.dFinprFeat, dtype=torch.float32).to(device),
-                  # "atomSeq": torch.tensor(self.dSeqTokenized, dtype=torch.long).to(device),
                   "pEmbeddings": torch.tensor(self.id2emb, dtype=torch.float32).to(device),
-                  # "ST_fingerprint": torch.tensor(self.ST_fingerprint[dTokenizedNames], dtype=torch.float32).to(
-                  #     device)
               }, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
-        # Ypre, Y = model.calculate_y_prob_by_iterator(
-            # dataClass.one_epoch_batch_data_stream(batchSize=128, type='test', device=torch.device('cpu')))
+
