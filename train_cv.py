@@ -52,40 +52,46 @@ test = np.array(data_class.eSeqData['test'])
 train_stats = []
 valid_stats = []
 test_stats = []
+
 useFeatures = {"pEmbeddings": False, "kmers": True, "pSeq": True,
-               "FP": True, "dSeq": True, "ST_fingerprint": False}
+                   "FP": True, "dSeq": True, "ST_fingerprint": False}
+for iter in range(2):
+    model = DTI_Bridge(outSize=128,
+                       cHiddenSizeList=[1024],
+                       fHiddenSizeList=[1024, 256],
+                       fSize=1024, cSize=data_class.pContFeat.shape[1],
+                       gcnHiddenSizeList=[128, 128], fcHiddenSizeList=[128], nodeNum=64,
+                       hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'),
+                       useFeatures=useFeatures)
+    avg_results = model.cv_train(data_class, trainSize=512, batchSize=512, epoch=128,
+                                 stopRounds=-1, earlyStop=30,
+                                 savePath=save_path, metrics="AUC",
+                                 report=report,
+                                 preheat=0)
+    # train_stats.append(model.final_res['training'])
+    # valid_stats.append(model.final_res['valid'])
+    iteration_train = []
+    iteration_valid = []
+    for subset in ['train', 'valid']:
+        for met in report:
+            iteration_train.append(avg_results['train'][met])
+            iteration_valid.append(avg_results['valid'][met])
+    train_stats.append(iteration_train)
+    valid_stats.append(iteration_valid)
 
-model = DTI_Bridge(outSize=128,
-                   cHiddenSizeList=[1024],
-                   fHiddenSizeList=[1024, 256],
-                   fSize=1024, cSize=data_class.pContFeat.shape[1],
-                   gcnHiddenSizeList=[128, 128], fcHiddenSizeList=[128], nodeNum=64,
-                   hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'),
-                   useFeatures=useFeatures)
-avg_results = model.cv_train(data_class, trainSize=512, batchSize=512, epoch=128,
-                             stopRounds=-1, earlyStop=30,
-                             savePath=save_path, metrics="AUC",
-                             report=report,
-                             preheat=0)
-# train_stats.append(model.final_res['training'])
-# valid_stats.append(model.final_res['valid'])
-iteration_train = []
-iteration_valid = []
-for subset in ['train', 'valid']:
-    for met in report:
-        iteration_train.append(avg_results['train'][met])
-        iteration_valid.append(avg_results['valid'][met])
-train_stats.append(iteration_train)
-valid_stats.append(iteration_valid)
+    # # Get test results
+    model.to_eval_mode()
+    Ypre, Y, seenbool = model.calculate_y_with_seenbool(
+        data_class.one_epoch_batch_data_stream(batchSize=128, type='test', device=torch.device('cuda')))
+    metrictor = Metrictor()
+    metrictor.set_data(Ypre, Y)
+    test_stats.append([metrictor.ACC(), metrictor.AUC(), metrictor.Precision(), metrictor.Recall(), metrictor.F1()])
 
-# # Get test results
-model.to_eval_mode()
-Ypre, Y, seenbool = model.calculate_y_with_seenbool(
-    data_class.one_epoch_batch_data_stream(batchSize=128, type='test', device=torch.device('cuda')))
-metrictor = Metrictor()
-metrictor.set_data(Ypre, Y)
-test_stats.append([metrictor.ACC(), metrictor.AUC(), metrictor.Precision(), metrictor.Recall(), metrictor.F1()])
+    log_per_iteration(data, useFeatures, iteration_train, iteration_valid,
+                      [metrictor.ACC(), metrictor.AUC(), metrictor.Precision(), metrictor.Recall(), metrictor.F1()])
+    print(f'done iteration {iter} on test {data}')
 
-log_per_iteration(data, useFeatures, iteration_train, iteration_valid,
-                  [metrictor.ACC(), metrictor.AUC(), metrictor.Precision(), metrictor.Recall(), metrictor.F1()])
-print(f'done iteration {iter} on test {data}')
+train_mean = np.mean(np.array(train_stats), axis=0)
+valid_mean = np.mean(np.array(valid_stats), axis=0)
+test_mean = np.mean(np.array(test_stats), axis=0)
+log(data, useFeatures, train_mean, valid_mean, test_mean)
