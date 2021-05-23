@@ -30,7 +30,7 @@ class BaseClassifier:
         data = np.concatenate((dataClass.eSeqData['train'], dataClass.eSeqData['valid']))
 
         results = []
-        results_train_val = {'train': [], 'test': []}
+        results_train_val = {'train': [], 'valid': []}
         for i, (train_index, test_index) in enumerate(skf.split(data)):
             dataClass.eSeqData['train'] = data[train_index]
             dataClass.eSeqData['valid'] = data[test_index]
