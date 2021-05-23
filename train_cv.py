@@ -42,6 +42,7 @@ data = "celegans"
 data_path = Path(os.path.join("data", data))
 assert data_path.exists()
 
+report = ["ACC", "AUC", "LOSS", "Precision", "Recall", "F1"]
 # Get the human/celegans class
 data_class = LoadCelegansHuman(dataPath=data_path, device=torch.device('cuda'))
 
@@ -64,12 +65,18 @@ model = DTI_Bridge(outSize=128,
 avg_results = model.cv_train(data_class, trainSize=512, batchSize=512, epoch=128,
                              stopRounds=-1, earlyStop=30,
                              savePath=save_path, metrics="AUC",
-                             report=["ACC", "AUC", "LOSS", "Precision", "Recall", "F1"],
+                             report=report,
                              preheat=0)
 # train_stats.append(model.final_res['training'])
 # valid_stats.append(model.final_res['valid'])
-train_stats.append(avg_results['train'])
-valid_stats.append(avg_results['valid'])
+iteration_train = []
+iteration_valid = []
+for subset in ['train', 'valid']:
+    for met in report:
+        iteration_train.append(avg_results['train'][met])
+        iteration_valid.append(avg_results['valid'][met])
+train_stats.append(iteration_train)
+valid_stats.append(iteration_valid)
 
 # # Get test results
 model.to_eval_mode()
@@ -79,6 +86,6 @@ metrictor = Metrictor()
 metrictor.set_data(Ypre, Y)
 test_stats.append([metrictor.ACC(), metrictor.AUC(), metrictor.Precision(), metrictor.Recall(), metrictor.F1()])
 
-log_per_iteration(data, useFeatures, model.final_res['training'], model.final_res['valid'],
+log_per_iteration(data, useFeatures, iteration_train, iteration_valid,
                   [metrictor.ACC(), metrictor.AUC(), metrictor.Precision(), metrictor.Recall(), metrictor.F1()])
 print(f'done iteration {iter} on test {data}')
