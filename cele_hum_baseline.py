@@ -76,11 +76,14 @@ for data in ["celegans", "human"]:
         # valid_stats.append(model.final_res['valid'])
         # train_stats.append(avg_results['train'])
         # valid_stats.append(avg_results['valid'])
-
+        iteration_train = []
+        iteration_valid = []
         for subset in ['train', 'valid']:
             for met in report:
-                train_stats.append(avg_results['train'][met])
-                valid_stats.append(avg_results['valid'][met])
+                iteration_train.append(avg_results['train'][met])
+                iteration_valid.append(avg_results['valid'][met])
+        train_stats.append(iteration_train)
+        valid_stats.append(iteration_valid)
 
         # # Get test results
         model.to_eval_mode()
@@ -90,7 +93,7 @@ for data in ["celegans", "human"]:
         metrictor.set_data(Ypre, Y)
         test_stats.append([metrictor.ACC(), metrictor.AUC(), metrictor.Precision(), metrictor.Recall(), metrictor.F1()])
 
-        log_per_iteration(data, useFeatures, model.final_res['training'], model.final_res['valid'],
+        log_per_iteration(data, useFeatures, iteration_train, iteration_valid,
                           [metrictor.ACC(), metrictor.AUC(), metrictor.Precision(), metrictor.Recall(), metrictor.F1()])
         print(f'done iteration {iter} on test {data}')
 
