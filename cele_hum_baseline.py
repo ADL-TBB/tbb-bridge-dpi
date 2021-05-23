@@ -38,8 +38,7 @@ def log_per_iteration(data, setting, train, valid, test):
     logger.info('\n')
 
 
-
-#Training data binding DB
+report = ["ACC", "AUC", "LOSS", "Precision", "Recall", "F1"]
 
 for data in ["celegans", "human"]:
 
@@ -71,12 +70,17 @@ for data in ["celegans", "human"]:
                            useFeatures=useFeatures)
         avg_results = model.cv_train(data_class, trainSize=512, batchSize=512, epoch=128,
                     stopRounds=-1, earlyStop=30,
-                    savePath=save_path, metrics="AUC", report=["ACC", "AUC", "LOSS", "Precision", "Recall", "F1"],
+                    savePath=save_path, metrics="AUC", report=report,
                     preheat=0)
         # train_stats.append(model.final_res['training'])
         # valid_stats.append(model.final_res['valid'])
-        train_stats.append(avg_results['train'])
-        valid_stats.append(avg_results['valid'])
+        # train_stats.append(avg_results['train'])
+        # valid_stats.append(avg_results['valid'])
+
+        for subset in ['train', 'valid']:
+            for met in report:
+                train_stats.append(avg_results['train'][met])
+                valid_stats.append(avg_results['valid'][met])
 
         # # Get test results
         model.to_eval_mode()
@@ -94,5 +98,3 @@ for data in ["celegans", "human"]:
     valid_mean = np.mean(np.array(valid_stats), axis=0)
     test_mean = np.mean(np.array(test_stats), axis=0)
     log(data, useFeatures, train_mean, valid_mean, test_mean)
-
-
