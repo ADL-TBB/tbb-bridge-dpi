@@ -28,10 +28,6 @@ class BaseLoader:
         self._create_features()
 
     def _create_features(self):
-        # TODO: add methods that just load the features for the respective models: baseline, etc
-        #  or with if statements with feature lists
-        # TODO: add no_split to if else statements in loading of features
-        # TODO: call customized methods in train and predict subclasses
         # These data will be filled with append values in the methods called
         # down below.
         self.p2id, self.id2p = {}, []
@@ -329,11 +325,11 @@ class BaseLoader:
         return pOnehot
 
     def get_onehot_proteins_unclipped(self):
-        '''
+        """
         Create one-hot encoded proteins without defining a maximum length.
         For every protein a 2D array [protein length, amino acids]: for every row/place in the sequence
         a 1 at the index of the amino acid that's present there.
-        '''
+        """
         n_proteinIDs = len(self.id2p)
         n_aminoIDs = len(self.id2am)
         pList = []
@@ -346,61 +342,41 @@ class BaseLoader:
             pList.append(pOneHot)
         return np.array(pList, dtype=np.object)
 
-    def retrieve_batch(self):
-        pass
+    def retrieve_batch(self, batchSize, edges, device):
+        """
+        generic loop to return batch
+        """
+        for i in range((len(edges) + batchSize - 1) // batchSize):
+            samples = edges[i * batchSize:(i + 1) * batchSize]
+            pTokenizedNames, dTokenizedNames = [i[0] for i in samples], [i[1] for i in samples]
+            batch_dict = deepcopy(self.batch_dict)
 
-    def one_epoch_batch_data_stream(self, batchSize=32, type='valid', device=torch.device('cpu')):
+            for feat in batch_dict.keys():
+                if feat in self.protein_feats:
+                    batch_dict[feat] = batch_dict[feat][pTokenizedNames].to(device)
+                elif feat in self.drug_feats:
+                    batch_dict[feat] = batch_dict[feat][dTokenizedNames].to(device)
+
+            batch_dict['res'] = True
+            print('one loop')
+            yield batch_dict, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
+
+    def one_epoch_batch_data_stream(self, batchSize=32, type='valid', device='gpu'):
         edges = self.eSeqData[type]
         indexes = np.arange(len(edges))
         np.random.shuffle(indexes)
         edges = edges[indexes]
-        for i in range((len(edges) + batchSize - 1) // batchSize):
-            samples = edges[i * batchSize:(i + 1) * batchSize]
-            pTokenizedNames, dTokenizedNames = [i[0] for i in samples], [i[1] for i in samples]
-            batch_dict = deepcopy(self.batch_dict)
+        self.retrieve_batch(batchSize, edges, device)
 
-            for feat in batch_dict.keys():
-                if feat in self.protein_feats:
-                    batch_dict[feat] = batch_dict[feat][pTokenizedNames].to(device)
-                elif feat in self.drug_feats:
-                    batch_dict[feat] = batch_dict[feat][dTokenizedNames].to(device)
-
-            batch_dict['res'] = True
-            yield batch_dict, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
-
-    def random_batch_data_stream(self, batchSize=32, type='train', device=torch.device('cpu')):
+    def random_batch_data_stream(self, batchSize=32, type='train', device='gpu'):
         edges = [i for i in self.eSeqData[type]]
         while True:
             random.shuffle(edges)
-            for i in range((len(edges) + batchSize - 1) // batchSize):
-                samples = edges[i * batchSize:(i + 1) * batchSize]
-                pTokenizedNames, dTokenizedNames = [i[0] for i in samples], [i[1] for i in samples]
-                batch_dict = deepcopy(self.batch_dict)
+            self.retrieve_batch(batchSize, edges, device)
 
-                for feat in batch_dict.keys():
-                    if feat in self.protein_feats:
-                        batch_dict[feat] = batch_dict[feat][pTokenizedNames].to(device)
-                    elif feat in self.drug_feats:
-                        batch_dict[feat] = batch_dict[feat][dTokenizedNames].to(device)
-
-                batch_dict['res'] = True
-                yield batch_dict, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
- 
-    def unshuffled_data_stream(self, batchSize=32, type='test', device=torch.device('cpu')):
+    def unshuffled_data_stream(self, batchSize=32, type='test', device='gpu'):
         edges = self.eSeqData[type]
-        for i in range((len(edges) + batchSize - 1) // batchSize):
-            samples = edges[i * batchSize:(i + 1) * batchSize]
-            pTokenizedNames, dTokenizedNames = [i[0] for i in samples], [i[1] for i in samples]
-            batch_dict = deepcopy(self.batch_dict)
-
-            for feat in batch_dict.keys():
-                if feat in self.protein_feats:
-                    batch_dict[feat] = batch_dict[feat][pTokenizedNames].to(device)
-                elif feat in self.drug_feats:
-                    batch_dict[feat] = batch_dict[feat][dTokenizedNames].to(device)
-
-            batch_dict['res'] = True
-            yield batch_dict, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
+        self.retrieve_batch(batchSize, edges, device)
 
 
 class LoadBindingDB(BaseLoader):
@@ -469,7 +445,7 @@ class LoadBindingDB(BaseLoader):
         for the sequences
         '''
         data = 'data'
-        path = os.path.join(data, 'embedding_files','prot_embedding_bindingDB.pkl')
+        path = os.path.join(data, 'embedding_files', 'prot_embedding_bindingDB.pkl')
         emb_file = open(path, 'rb')
         emb_dict = pkl.load(emb_file)
         emb_file.close()
@@ -523,7 +499,88 @@ class LoadCelegansHuman(BaseLoader):
             id2emb.append(emb_dict[protein])
         return id2emb
 
-class L(BaseLoader):
+class LoadChembl(BaseLoader):
+
+    def __init__(self, data_path, device, model_name, pSeqMaxLen=1024, dSeqMaxLen=128, kmers=-1, seed=42):
+        self.data_path = data_path
+        self.model_name = model_name
+        self.device = device
+        self.pSeqMaxLen = pSeqMaxLen
+        self.dSeqMaxLen = dSeqMaxLen
+        super(BaseLoader, self).__init__()
+        self._create_features()
+
+    def _create_features(self):
+        self.p2id, self.id2p = {}, []
+        self.d2id, self.id2d = {}, []
+        self.pSeqData = []
+        self.dMolData, self.dSeqData, self.dFeaData, self.dFinData, self.dSmilesData = [], [], [], [], []
+        self.pNameData, self.dNameData = {}, {}
+
+        # Import the data as {'train'/'valid'/'test': [drug, protein, label]}
+        self.data = self.load_data(self.data_path)
+
+        # Protein and drug data and their labels
+        self.eSeqData, self.edgeLab = {}, {}
+        self.initialize_ID_data(self.data)
+
+        # Check how many samples you have in training, test and validation sets
+        self.trainSampleNum, self.validSampleNum, self.testSampleNum = len(
+            self.eSeqData['train']), len(self.eSeqData['valid']), len(self.eSeqData['test'])
+
+        # Get the boolean vector of seen and unseen proteins
+        self.pSeen = self.get_seen_proteins()
+
+        self.protein_feats = ["aminoseq", "aminoCtr", "SeqLen", "seenbool", "pEmbeddings", "pOnehot"]
+        self.drug_feats = ["atomFea", "atomFin", "atomSeq", "dSeqLen", "ST_fingerprint"]
+
+        if self.model_name == 'BridgeDPI':
+            # create features for baseline model
+            # Initialize and assign each amino acid to a specific numerical id
+            self.am2id, self.id2am = {"<UNK>": 0, "<EOS>": 1}, ["<UNK>", "<EOS>"]
+            self.get_aminoacid_id()
+
+            # Initialize and assign each atom to a specific numerical id
+            self.at2id, self.id2at = {"<UNK>": 0, "<EOS>": 1}, ["<UNK>", "<EOS>"]
+            self.get_atom_id()
+
+            print("Tokenizing proteins and drugs...")
+            # Tokenize the proteins
+            self.pSeqTokenized, self.pSeqLen = self.tokenize_proteins()
+            self.pSeqTokenized = np.array(self.pSeqTokenized, dtype=np.int32)
+
+            # Tokenize the drugs
+            self.dSeqTokenized, self.dSeqLen = self.tokenize_drugs()
+            self.dSeqTokenized = np.array(self.dSeqTokenized, dtype=np.int32)
+
+            print("Creating other features...")
+
+            # Initialize the protein and drug kmer features
+            self.pContFeat = self.get_protein_kmer_features()
+            self.dFinprFeat = np.array(self.dFinData, dtype=np.float32)
+
+            self.batch_dict = {
+                "aminoSeq": torch.tensor(self.pSeqTokenized, dtype=torch.float32),
+                "aminoCtr": torch.tensor(self.pContFeat, dtype=torch.float32),
+                "atomFin": torch.tensor(self.dFinprFeat, dtype=torch.float32),
+                "atomSeq": torch.tensor(self.dSeqTokenized, dtype=torch.float32),
+                "seenbool": torch.tensor(self.pSeen, dtype=torch.bool),
+            }
+
+            print("done")
+
+        elif self.model_name == 'PembeddingBridge':
+            # create features for our model\#Create ELMO protein embeddings
+            self.id2emb = torch.stack(self.open_embeddings())
+
+            self.batch_dict = {
+                "atomFin": torch.tensor(self.dFinprFeat, dtype=torch.float32),
+                "seenbool": torch.tensor(self.pSeen, dtype=torch.bool),
+                "pEmbeddings": torch.tensor(self.id2emb, dtype=torch.float32),
+            }
+
+            print("done")
+
     def load_data(self, data_path, valid_size=0.1, test_size=0.1):
         '''
         Read file and return data as list of [drug, protein, label]
@@ -551,7 +608,7 @@ class L(BaseLoader):
         data['test'] = temp[split2:]
         return data
 
-    def create_embeddings(self):
+    def open_embeddings(self):
         '''
         Import the ELMO protein embeddings for either human of c.elegans dataset
         '''
