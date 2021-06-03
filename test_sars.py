@@ -35,7 +35,7 @@ model = DTI_Bridge(outSize=128,
 model.load(path=model_path, map_location="cuda", dataClass=data_class)
 model.to_eval_mode()
 
-stream = data_class.unshuffled_data_stream(batchSize=12, type='test', device=torch.device('cuda'))
+stream = data_class.random_batch_data_stream(batchSize=12, type='test', device=torch.device('cuda'), shuffle=False)
 
 YArr, Y_preArr = [], []
 # results = {}
