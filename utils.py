@@ -14,11 +14,12 @@ logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=lo
 
 
 class BaseLoader:
-    def __init__(self, dataPath, device='cuda', pSeqMaxLen=1024, dSeqMaxLen=128, seed=42):
+    def __init__(self, data_path, device='cuda', model_name='BridgeDPI', pSeqMaxLen=1024, dSeqMaxLen=128, seed=42):
         np.random.seed(seed)
         self.device = device
+        self.model_name = model_name
         # Initialize the parameters as attributes
-        self.dataPath = dataPath
+        self.dataPath = data_path
         self.pSeqMaxLen = pSeqMaxLen
         self.dSeqMaxLen = dSeqMaxLen
         self._create_features()
@@ -46,7 +47,7 @@ class BaseLoader:
         # Get the boolean vector of seen and unseen proteins
         self.pSeen = self.get_seen_proteins()
 
-        self.protein_feats = ["aminoseq", "aminoCtr", "SeqLen", "seenbool", "pEmbeddings", "pOnehot"]
+        self.protein_feats = ["aminoSeq", "aminoCtr", "SeqLen", "seenbool", "pEmbeddings", "pOnehot"]
         self.drug_feats = ["atomFea", "atomFin", "atomSeq", "dSeqLen", "ST_fingerprint"]
 
         if self.model_name == 'BridgeDPI':
@@ -64,21 +65,19 @@ class BaseLoader:
             self.pSeqTokenized, self.pSeqLen = self.tokenize_proteins()
             self.pSeqTokenized = np.array(self.pSeqTokenized, dtype=np.int32)
 
-            # Tokenize the drugs
-            self.dSeqTokenized, self.dSeqLen = self.tokenize_drugs()
-            self.dSeqTokenized = np.array(self.dSeqTokenized, dtype=np.int32)
-
             print("Creating other features...")
 
             # Initialize the protein and drug kmer features
             self.pContFeat = self.get_protein_kmer_features()
             self.dFinprFeat = np.array(self.dFinData, dtype=np.float32)
+            self.dGraphFeat = np.array(
+                [i[:self.dSeqMaxLen] + [[0] * 75] * (self.dSeqMaxLen - len(i)) for i in self.dFeaData], dtype=np.int8)
 
             self.batch_dict = {
-                "aminoSeq": torch.tensor(self.pSeqTokenized, dtype=torch.float32),
+                "aminoSeq": torch.tensor(self.pSeqTokenized, dtype=torch.long),
+                "atomFea": torch.tensor(self.dGraphFeat, dtype=torch.float32),
                 "aminoCtr": torch.tensor(self.pContFeat, dtype=torch.float32),
                 "atomFin": torch.tensor(self.dFinprFeat, dtype=torch.float32),
-                "atomSeq": torch.tensor(self.dSeqTokenized, dtype=torch.float32),
                 "seenbool": torch.tensor(self.pSeen, dtype=torch.bool),
             }
 
@@ -86,7 +85,7 @@ class BaseLoader:
 
         elif self.model_name == 'P_embeddingBridge':
             # create features for our model\#Create ELMO protein embeddings
-            self.id2emb = torch.stack(self.open_embeddings())
+            self.id2emb = torch.stack(self.load_pembeddings())
 
             self.batch_dict = {
                 "atomFin": torch.tensor(self.dFinprFeat, dtype=torch.float32),
@@ -125,7 +124,6 @@ class BaseLoader:
             }
 
             print("done\n")
-
 
     def load_data(self):
         '''Returns data in format [drug, protein, label]'''
@@ -496,7 +494,7 @@ class LoadBindingDB(BaseLoader):
         return proteinID, proteinSequence, aminoacidID, drugID, drugSMILES   
 
 
-    def create_embeddings(self):
+    def load_pembeddings(self):
         '''
         For all the proteins of the dataset, obtain the ELMO embeddings
         for the sequences
