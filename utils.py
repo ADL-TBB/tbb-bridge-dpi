@@ -1,4 +1,5 @@
 import numpy as np
+import gc
 import os,sys,logging,random,torch
 from deepchem.feat import graph_features
 from rdkit import Chem
@@ -153,6 +154,10 @@ class BaseLoader():
                     dCnt += 1
                 id_data.append([self.p2id[protein], self.d2id[drug], label])
             self.eSeqData[sub] = np.array(id_data, dtype=np.int32)
+
+        del data
+        del self.data
+        gc.collect()
 
     def get_aminoacid_id(self):
         '''
@@ -357,7 +362,6 @@ class BaseLoader():
             for i in range((len(edges) + batchSize - 1) // batchSize):
                 samples = edges[i * batchSize:(i + 1) * batchSize]
                 pTokenizedNames, dTokenizedNames = [i[0] for i in samples], [i[1] for i in samples]
-
                 yield {
                           "res": True,
                           "aminoSeq": torch.tensor(self.pSeqTokenized[pTokenizedNames], dtype=torch.long).to(
@@ -503,6 +507,8 @@ class LoadCelegansHuman(BaseLoader):
         data['train'] = temp[:split1]
         data['valid'] = temp[split1:split2]
         data['test'] = temp[split2:]
+        del temp
+        gc.collect()
         return data
     
     def create_embeddings(self):
@@ -514,12 +520,15 @@ class LoadCelegansHuman(BaseLoader):
             path = os.path.join(data, 'embedding_files','prot_embedding_human.pkl')
         else:
             path = os.path.join(data, 'embedding_files','prot_embedding_celegans.pkl')
-        emb_file = open(path, 'rb')
-        emb_dict = pkl.load(emb_file)
-        emb_file.close()
-        id2emb = []
-        for protein in self.p2id.keys():
-            id2emb.append(emb_dict[protein])
+
+        with open(path, 'rb') as emb_file:
+            emb_dict = pkl.load(emb_file)
+
+            id2emb = []
+            for protein in self.p2id.keys():
+                id2emb.append(emb_dict[protein])
+        del emb_dict
+        gc.collect()
         return id2emb
 
 
