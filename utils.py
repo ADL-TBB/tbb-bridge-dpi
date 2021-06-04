@@ -52,7 +52,7 @@ class BaseLoader:
         self.protein_feats = ["aminoSeq", "aminoCtr", "SeqLen", "seenbool", "pEmbeddings", "pOnehot"]
         self.drug_feats = ["atomFea", "atomFin", "atomSeq", "dSeqLen", "ST_fingerprint"]
 
-        if self.model_name not in ['p_Embedding_Bridge', 'p_Emb_ST_Bridge', 'p_Emb_Seq_Bridge']:
+        if self.model_name not in ['p_Embedding_Bridge', 'p_Emb_ST_Bridge', 'p_Embedding_Seq_Bridge']:
             # create features for baseline model
             # Initialize and assign each amino acid to a specific numerical id
             self.am2id, self.id2am = {"<UNK>": 0, "<EOS>": 1}, ["<UNK>", "<EOS>"]
@@ -103,7 +103,7 @@ class BaseLoader:
 
             print("done\n")
 
-        elif self.model_name == 'p_Emb_Seq_Bridge': # P embedding model with kmers and dseq
+        elif self.model_name == 'p_Embedding_Seq_Bridge': # P embedding model with kmers and dseq
             # create features for our model\#Create ELMO protein embeddings
             self.id2emb = torch.stack(self.load_pembeddings())
 
@@ -136,7 +136,7 @@ class BaseLoader:
 
             self.vocab = WordVocab.load_vocab('data/smiles_trfm_model/vocab.pkl')
             self.ST_fingerprint = self.get_ST_features()
-            self.id2emb = torch.stack(self.open_embeddings())
+            self.id2emb = torch.stack(self.load_pembeddings())
 
             self.batch_dict = {
                 "seenbool": torch.tensor(self.pSeen, dtype=torch.bool),

@@ -7,10 +7,14 @@ from pathlib import Path
 """
 model_name:
 
-DTI_Bridge
-ST_Bridge
-p_Embedding_Bridge
-p_Emb_ST_Bridge
+DTI_Bridge          # baseline model
+ST_Bridge           # baseline model with ST_fingerprint and pSeq + kmers
+p_Embedding_Bridge  # pEmbeddings with just morgan fingerprint
+p_Emb_ST_Bridge     # pEmbeddings with just st_fingerprint
+
+p_Embedding_Bridge  # pEmbeddings with kmers and dgraph features, useFeatures= {'dSeq': True, 'kmers': True, 
+'pEmbeddings': True, 'FP': True, 'ST_fingerprint': False, "pSeq": False}
+use p_Embedding_Seq_Bridge as model_name
 """
 
 # Choose dataset and modelfile name
@@ -38,7 +42,7 @@ model = DTI_Bridge(outSize=128,
                   hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'))
 
 """
-model class name correspond to model_name, like:
+model class name correspond to model_name variable name, like:
 
 model = p_Embedding_Bridge(outSize=128,
                   cHiddenSizeList=[1024],
@@ -48,15 +52,7 @@ model = p_Embedding_Bridge(outSize=128,
                   hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'))
 """
 
-
-
 model.train(data_class, trainSize=512, batchSize=512, epoch=128,
             stopRounds=-1, earlyStop=30,
             savePath=save_path, metrics="AUC", report=["ACC", "AUC", "LOSS"],
             preheat=0)
-'''
-model.cv_train(data_class, trainSize=512, batchSize=512, epoch=128,
-            stopRounds=-1, earlyStop=30,
-            savePath=save_path, metrics="AUC", report=["ACC", "AUC", "LOSS"],
-            preheat=0)
-'''
