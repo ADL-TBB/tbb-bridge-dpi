@@ -480,7 +480,7 @@ class ST_Bridge(Parent_Bridge):
                  gcnHiddenSizeList=[], fcHiddenSizeList=[], nodeNum=32, resnet=True,
                  hdnDropout=0.1, fcDropout=0.2, device=torch.device('cuda'),
                  useFeatures={"pEmbeddings": False, "kmers": True, "pSeq": True,
-                     "FP": True, "dSeq": True, "ST_fingerprint": True},
+                     "FP": False, "dSeq": True, "ST_fingerprint": True},
                  maskDTI=False):
         
         Parent_Bridge.__init__(self, outSize,
@@ -517,7 +517,6 @@ class p_Embedding_Bridge(Parent_Bridge):
                  useFeatures={"pEmbeddings": True, "kmers": False, "pSeq": False,
                               "FP": True, "dSeq": False, "ST_fingerprint": False},
                  maskDTI=False):
-
         # TODO: ask if PSeq and DSeq should stay True?
 
         Parent_Bridge.__init__(self, outSize,

@@ -1,4 +1,5 @@
 import numpy as np
+import gc
 import os,sys,logging,random,torch
 from deepchem.feat import graph_features
 from rdkit import Chem
@@ -9,17 +10,18 @@ from copy import deepcopy
 import pickle as pkl
 from sklearn.feature_extraction.text import CountVectorizer
 sys.path.insert(0, 'smiles_transformer')
+from smiles_transformer.build_vocab import WordVocab
 
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
 
 class BaseLoader:
-    def __init__(self, data_path, device='cuda', model_name='BridgeDPI', pSeqMaxLen=1024, dSeqMaxLen=128, seed=42):
+    def __init__(self, dataPath, device='cuda', model_name='DTI_Bridge', pSeqMaxLen=1024, dSeqMaxLen=128, seed=42):
         np.random.seed(seed)
         self.device = device
         self.model_name = model_name
         # Initialize the parameters as attributes
-        self.dataPath = data_path
+        self.dataPath = dataPath
         self.pSeqMaxLen = pSeqMaxLen
         self.dSeqMaxLen = dSeqMaxLen
         self._create_features()
@@ -34,7 +36,7 @@ class BaseLoader:
         self.pNameData, self.dNameData = {}, {}
 
         # Import the data as {'train'/'valid'/'test': [drug, protein, label]}
-        self.data = self.load_data(self.data_path)
+        self.data = self.load_data(self.dataPath)
 
         # Protein and drug data and their labels
         self.eSeqData, self.edgeLab = {}, {}
@@ -50,15 +52,15 @@ class BaseLoader:
         self.protein_feats = ["aminoSeq", "aminoCtr", "SeqLen", "seenbool", "pEmbeddings", "pOnehot"]
         self.drug_feats = ["atomFea", "atomFin", "atomSeq", "dSeqLen", "ST_fingerprint"]
 
-        if self.model_name == 'BridgeDPI':
+        if self.model_name not in ['p_Embedding_Bridge', 'p_Emb_ST_Bridge', 'p_Emb_Seq_Bridge']:
             # create features for baseline model
             # Initialize and assign each amino acid to a specific numerical id
             self.am2id, self.id2am = {"<UNK>": 0, "<EOS>": 1}, ["<UNK>", "<EOS>"]
             self.get_aminoacid_id()
 
-            # Initialize and assign each atom to a specific numerical id
-            self.at2id, self.id2at = {"<UNK>": 0, "<EOS>": 1}, ["<UNK>", "<EOS>"]
-            self.get_atom_id()
+            # # Initialize and assign each atom to a specific numerical id
+            # self.at2id, self.id2at = {"<UNK>": 0, "<EOS>": 1}, ["<UNK>", "<EOS>"]
+            # self.get_atom_id()
 
             print("Tokenizing proteins and drugs...")
             # Tokenize the proteins
@@ -67,12 +69,18 @@ class BaseLoader:
 
             print("Creating other features...")
 
+        if self.model_name not in ['p_Emb_ST_Bridge', 'p_Embedding_Bridge']:
             # Initialize the protein and drug kmer features
             self.pContFeat = self.get_protein_kmer_features()
+
+        if self.model_name not in ['ST_Bridge']:
             self.dFinprFeat = np.array(self.dFinData, dtype=np.float32)
+
+        if self.model_name not in ['p_Embedding_Bridge', 'ST_Bridge', 'p_Emb_ST_Bridge']:
             self.dGraphFeat = np.array(
                 [i[:self.dSeqMaxLen] + [[0] * 75] * (self.dSeqMaxLen - len(i)) for i in self.dFeaData], dtype=np.int8)
 
+        if self.model_name == 'DTI_Bridge':
             self.batch_dict = {
                 "aminoSeq": torch.tensor(self.pSeqTokenized, dtype=torch.long),
                 "atomFea": torch.tensor(self.dGraphFeat, dtype=torch.float32),
@@ -83,7 +91,7 @@ class BaseLoader:
 
             print("done\n")
 
-        elif self.model_name == 'P_embeddingBridge':
+        elif self.model_name == 'p_Embedding_Bridge':
             # create features for our model\#Create ELMO protein embeddings
             self.id2emb = torch.stack(self.load_pembeddings())
 
@@ -95,29 +103,42 @@ class BaseLoader:
 
             print("done\n")
 
-        elif self.model_name == "ST_Bridge":
-            from smiles_transformer.build_vocab import WordVocab
-
-            self.vocab = WordVocab.load_vocab('data/smiles_trfm_model/vocab.pkl')
-            self.ST_fingerprint = self.get_ST_features()
+        elif self.model_name == 'p_Emb_Seq_Bridge': # P embedding model with kmers and dseq
+            # create features for our model\#Create ELMO protein embeddings
+            self.id2emb = torch.stack(self.load_pembeddings())
 
             self.batch_dict = {
                 "atomFin": torch.tensor(self.dFinprFeat, dtype=torch.float32),
+                "atomFea": torch.tensor(self.dGraphFeat, dtype=torch.float32),
+                "aminoCtr": torch.tensor(self.pContFeat, dtype=torch.float32),
+                "pEmbeddings": torch.tensor(self.id2emb, dtype=torch.float32),
                 "seenbool": torch.tensor(self.pSeen, dtype=torch.bool),
-                "ST_fingerprint": torch.tensor(self.ST_fingerprint, dtype=torch.float32)
             }
 
             print("done\n")
 
-        elif self.model_name == "P_emb_ST_bridge":
-            from smiles_transformer.build_vocab import WordVocab
+        elif self.model_name == "ST_Bridge":
+            self.vocab = WordVocab.load_vocab('data/smiles_trfm_model/vocab.pkl')
+            self.ST_fingerprint = self.get_ST_features()
+
+            self.batch_dict = {
+                "aminoSeq": torch.tensor(self.pSeqTokenized, dtype=torch.long),
+                "aminoCtr": torch.tensor(self.pContFeat, dtype=torch.float32),
+                "ST_fingerprint": torch.tensor(self.ST_fingerprint, dtype=torch.float32),
+                "seenbool": torch.tensor(self.pSeen, dtype=torch.bool),
+
+            }
+
+            print("done\n")
+
+        elif self.model_name == "p_Emb_ST_Bridge":
+            # from smiles_transformer.build_vocab import WordVocab
 
             self.vocab = WordVocab.load_vocab('data/smiles_trfm_model/vocab.pkl')
             self.ST_fingerprint = self.get_ST_features()
             self.id2emb = torch.stack(self.open_embeddings())
 
             self.batch_dict = {
-                "atomFin": torch.tensor(self.dFinprFeat, dtype=torch.float32),
                 "seenbool": torch.tensor(self.pSeen, dtype=torch.bool),
                 "pEmbeddings": torch.tensor(self.id2emb, dtype=torch.float32),
                 "ST_fingerprint": torch.tensor(self.ST_fingerprint, dtype=torch.float32)
@@ -187,6 +208,10 @@ class BaseLoader:
                     dCnt += 1
                 id_data.append([self.p2id[protein], self.d2id[drug], label])
             self.eSeqData[sub] = np.array(id_data, dtype=np.int32)
+
+        del data
+        del self.data
+        gc.collect()
 
     def get_aminoacid_id(self):
         '''
@@ -359,25 +384,6 @@ class BaseLoader:
             pList.append(pOneHot)
         return np.array(pList, dtype=np.object)
 
-    # def retrieve_batch(self, batchSize, edges, device):
-    #     """
-    #     generic loop to return batch
-    #     """
-    #     for i in range((len(edges) + batchSize - 1) // batchSize):
-    #         samples = edges[i * batchSize:(i + 1) * batchSize]
-    #         pTokenizedNames, dTokenizedNames = [i[0] for i in samples], [i[1] for i in samples]
-    #         batch_dict = deepcopy(self.batch_dict)
-    #
-    #         for feat in batch_dict.keys():
-    #             if feat in self.protein_feats:
-    #                 batch_dict[feat] = batch_dict[feat][pTokenizedNames].to(device)
-    #             elif feat in self.drug_feats:
-    #                 batch_dict[feat] = batch_dict[feat][dTokenizedNames].to(device)
-    #
-    #         batch_dict['res'] = True
-    #         print('one loop')
-    #         yield batch_dict, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
-
     def one_epoch_batch_data_stream(self, batchSize=32, type='valid', device='gpu'):
         edges = self.eSeqData[type]
         indexes = np.arange(len(edges))
@@ -432,6 +438,7 @@ class BaseLoader:
     #         batch_dict['res'] = True
     #         print('one loop')
     #         yield batch_dict, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
+
 
 
 class LoadBindingDB(BaseLoader):
@@ -500,7 +507,7 @@ class LoadBindingDB(BaseLoader):
         for the sequences
         '''
         data = 'data'
-        path = os.path.join(data, 'embedding_files', 'prot_embedding_bindingDB.pkl')
+        path = os.path.join(data, 'embedding_files', 'prot_embedding_bindingdb.pkl')
         emb_file = open(path, 'rb')
         emb_dict = pkl.load(emb_file)
         emb_file.close()
@@ -510,13 +517,13 @@ class LoadBindingDB(BaseLoader):
         return id2emb     
 
 class LoadCelegansHuman(BaseLoader):
-    def load_data(self, data_path, valid_size=0.1, test_size=0.1):
+    def load_data(self, dataPath, valid_size=0.1, test_size=0.1):
         '''
         Read file and return data as list of [drug, protein, label]
         '''
         print('\nReading the raw data...')
         temp = []
-        file = open(os.path.join(data_path, 'data.txt'), 'r')
+        file = open(os.path.join(dataPath, 'data.txt'), 'r')
         for line in file.readlines():
             if line == '':
                 break
@@ -535,9 +542,11 @@ class LoadCelegansHuman(BaseLoader):
         data['train'] = temp[:split1]
         data['valid'] = temp[split1:split2]
         data['test'] = temp[split2:]
+        del temp
+        gc.collect()
         return data
     
-    def create_embeddings(self):
+    def load_pembeddings(self):
         '''
         Import the ELMO protein embeddings for either human of c.elegans dataset
         '''
@@ -546,32 +555,29 @@ class LoadCelegansHuman(BaseLoader):
             path = os.path.join(data, 'embedding_files','prot_embedding_human.pkl')
         else:
             path = os.path.join(data, 'embedding_files','prot_embedding_celegans.pkl')
-        emb_file = open(path, 'rb')
-        emb_dict = pkl.load(emb_file)
-        emb_file.close()
-        id2emb = []
-        for protein in self.p2id.keys():
-            id2emb.append(emb_dict[protein])
+
+        with open(path, 'rb') as emb_file:
+            emb_dict = pkl.load(emb_file)
+
+            id2emb = []
+            for protein in self.p2id.keys():
+                id2emb.append(emb_dict[protein])
+        del emb_dict
+        gc.collect()
         return id2emb
 
 class LoadChembl(BaseLoader):
+    """
+    Placeholder class for training of the chembl model
+    """
 
-    def __init__(self, data_path, device, model_name, pSeqMaxLen=1024, dSeqMaxLen=128, seed=42):
-        self.data_path = data_path
-        self.model_name = model_name
-        self.device = device
-        self.pSeqMaxLen = pSeqMaxLen
-        self.dSeqMaxLen = dSeqMaxLen
-        super(BaseLoader, self).__init__()
-        self._create_features()
-
-    def load_data(self, data_path, valid_size=0.1, test_size=0.1):
+    def load_data(self, dataPath, valid_size=0.1, test_size=0.1):
         '''
         Read file and return data as list of [drug, protein, label]
         '''
         print('\nReading the raw data...')
         temp = []
-        file = open(os.path.join(data_path, 'data.txt'), 'r')
+        file = open(os.path.join(dataPath, 'data.txt'), 'r')
         for line in file.readlines():
             if line == '':
                 break
@@ -592,18 +598,15 @@ class LoadChembl(BaseLoader):
         data['test'] = temp[split2:]
         return data
 
-    def open_embeddings(self):
+    def load_pembeddings(self):
         '''
-        Import the ELMO protein embeddings for either human of c.elegans dataset
+        For all the proteins of the dataset, obtain the ELMO embeddings
+        for the sequences (embedding file should be of the format: prot_embedding_{datasetname}.pkl
         '''
         data = 'data'
-        if 'human' in str(self.dataPath):
-            path = os.path.join(data, 'embedding_files', 'prot_embedding_human.pkl')
-        else:
-            path = os.path.join(data, 'embedding_files', 'prot_embedding_celegans.pkl')
-        emb_file = open(path, 'rb')
-        emb_dict = pkl.load(emb_file)
-        emb_file.close()
+        path = os.path.join(data, 'embedding_files', f'prot_embedding_{self.dataPath.name}.pkl')
+        with open(path, 'rb') as emb_file:
+            emb_dict = pkl.load(emb_file)
         id2emb = []
         for protein in self.p2id.keys():
             id2emb.append(emb_dict[protein])
@@ -735,8 +738,11 @@ class LoadSarscov2_with_BindingDB(BaseLoader):
 
 
 class PredictInteractions(BaseLoader):
-    def __init__(self, data_path, device):
-        self.data_path = data_path
+    """
+    Instantly predict without training, (as for now) just for the Pembeddings model
+    """
+    def __init__(self, dataPath, device):
+        self.dataPath = dataPath
         self.device = device
         self.records = self.load_data()
         self.emb_dict = self.open_embeddings()
@@ -745,7 +751,7 @@ class PredictInteractions(BaseLoader):
 
     def load_data(self):
         records = []
-        file = open(os.path.join(self.data_path, 'data.txt'), 'r')
+        file = open(os.path.join(self.dataPath, 'data.txt'), 'r')
         for line in file.readlines():
             if line == '':
                 break
@@ -759,7 +765,6 @@ class PredictInteractions(BaseLoader):
         dFinData = []
         for record in self.records:
             drug, protein, label = record
-            # print(drug, drug, label)
             tmp = np.ones((1,))
             mol = Chem.MolFromSmiles(drug)
             DataStructs.ConvertToNumpyArray(AllChem.GetHashedMorganFingerprint(mol, 2, nBits=1024), tmp)
@@ -776,7 +781,7 @@ class PredictInteractions(BaseLoader):
         for the sequences
         '''
         data = 'data'
-        path = os.path.join(data, 'embedding_files','prot_embedding_mtb.pkl')
+        path = os.path.join(data, 'embedding_files', f'prot_embedding_{self.dataPath.name}.pkl')
         emb_file = open(path, 'rb')
         emb_dict = pkl.load(emb_file)
         emb_file.close()
