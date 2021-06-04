@@ -8,19 +8,13 @@ from pathlib import Path
 import torch
 
 #Select the dataset and the path/pickle file where the data will be saved
-dataset = "bindingdb" # celegans / human / bindingdb
 model_path = "TEST_binding_db"
-model = 'DTI_bridge'
+model = 'DTI_bridge' #Change it with pEmbeddings for when you run the test with those
 dump_file = "misclass_pEmbeddings"
 
 data_path = Path(os.path.join("data", dataset))
 
 #Create the data class
-if dataset=='celegans' or dataset=='human':
-    data_class = LoadCelegansHuman(dataPath=data_path)
-else: #bindingdb
-    data_class = LoadBindingDB(dataPath=data_path)
-
 data_class = LoadBindingDB(dataPath=data_path)
 
 #Create the model
