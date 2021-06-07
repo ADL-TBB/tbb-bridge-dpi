@@ -31,12 +31,13 @@ class BaseLoader:
         # down below.
         self.p2id, self.id2p = {}, []
         self.d2id, self.id2d = {}, []
+        self.drug_names = []
         self.pSeqData = []
         self.dMolData, self.dSeqData, self.dFeaData, self.dFinData, self.dSmilesData = [], [], [], [], []
         self.pNameData, self.dNameData = {}, {}
 
         # Import the data as {'train'/'valid'/'test': [drug, protein, label]}
-        self.data = self.load_data(self.dataPath)
+        self.data, self.data_names = self.load_data(self.dataPath)
 
         # Protein and drug data and their labels
         self.eSeqData, self.edgeLab = {}, {}
@@ -198,6 +199,7 @@ class BaseLoader:
         print("\nCreating IDs...")
         pCnt, dCnt = 0, 0
         for sub in ['train', 'valid', 'test']:
+            idx = 0
             self.pNameData[sub], self.dNameData[sub] = [], []
             id_data = []
             for drug, protein, label in data[sub]:
@@ -205,7 +207,9 @@ class BaseLoader:
                     pCnt += 1
                 if (self.create_drugID(drug, dCnt)):
                     self.get_drug_features(drug)
+                    self.drug_names.append(self.data_names[sub][idx][0])
                     dCnt += 1
+                idx += 1
                 id_data.append([self.p2id[protein], self.d2id[drug], label])
             self.eSeqData[sub] = np.array(id_data, dtype=np.int32)
 
@@ -431,6 +435,7 @@ class LoadBindingDB(BaseLoader):
         '''
         print('\nReading the raw data...\n')
         data = {'train': [], 'valid': [], 'test': []}
+        data_ids = {'train': [], 'valid': [], 'test': []}
         for folder in ['train', 'dev', 'test']:
             print("\tOpened " + folder)
             path = os.path.join(dataPath, folder)
@@ -458,10 +463,12 @@ class LoadBindingDB(BaseLoader):
                         label = '1'
                     if folder != 'dev':
                         data[folder].append(np.array((drug, protein, int(label))))
+                        data_ids[folder].append(np.array((dID, pID, int(label))))
                     else:
                         data['valid'].append(np.array((drug, protein, int(label))))
+                        data_ids['valid'].append(np.array((dID, pID, int(label))))
                 file.close()
-        return data
+        return data, data_ids
 
     def get_info(self, data_path):
         # protein: protein IDs (e.g. A4D1B5)

@@ -6,12 +6,10 @@ from pathlib import Path
 
 """
 model_name:
-
 DTI_Bridge          # baseline model
 ST_Bridge           # baseline model with ST_fingerprint and pSeq + kmers
 p_Embedding_Bridge  # pEmbeddings with just morgan fingerprint
 p_Emb_ST_Bridge     # pEmbeddings with just st_fingerprint
-
 p_Embedding_Bridge  # pEmbeddings with kmers and dgraph features, useFeatures= {'dSeq': True, 'kmers': True, 
 'pEmbeddings': True, 'FP': True, 'ST_fingerprint': False, "pSeq": False}
 use p_Embedding_Seq_Bridge as model_name
@@ -43,7 +41,6 @@ model = DTI_Bridge(outSize=128,
 
 """
 model class name correspond to model_name variable name, like:
-
 model = p_Embedding_Bridge(outSize=128,
                   cHiddenSizeList=[1024],
                   fHiddenSizeList=[1024, 256],
