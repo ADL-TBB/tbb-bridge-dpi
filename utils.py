@@ -422,23 +422,6 @@ class BaseLoader:
                 batch_dict['res'] = True
                 yield batch_dict, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
 
-    # def unshuffled_data_stream(self, batchSize=32, type='test', device='gpu'):
-    #     edges = self.eSeqData[type]
-    #     for i in range((len(edges) + batchSize - 1) // batchSize):
-    #         samples = edges[i * batchSize:(i + 1) * batchSize]
-    #         pTokenizedNames, dTokenizedNames = [i[0] for i in samples], [i[1] for i in samples]
-    #         batch_dict = deepcopy(self.batch_dict)
-    #
-    #         for feat in batch_dict.keys():
-    #             if feat in self.protein_feats:
-    #                 batch_dict[feat] = batch_dict[feat][pTokenizedNames].to(device)
-    #             elif feat in self.drug_feats:
-    #                 batch_dict[feat] = batch_dict[feat][dTokenizedNames].to(device)
-    #
-    #         batch_dict['res'] = True
-    #         print('one loop')
-    #         yield batch_dict, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
-
 
 
 class LoadBindingDB(BaseLoader):
