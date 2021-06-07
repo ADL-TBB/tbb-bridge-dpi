@@ -426,23 +426,6 @@ class BaseLoader:
                 batch_dict['res'] = True
                 yield batch_dict, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
 
-    # def unshuffled_data_stream(self, batchSize=32, type='test', device='gpu'):
-    #     edges = self.eSeqData[type]
-    #     for i in range((len(edges) + batchSize - 1) // batchSize):
-    #         samples = edges[i * batchSize:(i + 1) * batchSize]
-    #         pTokenizedNames, dTokenizedNames = [i[0] for i in samples], [i[1] for i in samples]
-    #         batch_dict = deepcopy(self.batch_dict)
-    #
-    #         for feat in batch_dict.keys():
-    #             if feat in self.protein_feats:
-    #                 batch_dict[feat] = batch_dict[feat][pTokenizedNames].to(device)
-    #             elif feat in self.drug_feats:
-    #                 batch_dict[feat] = batch_dict[feat][dTokenizedNames].to(device)
-    #
-    #         batch_dict['res'] = True
-    #         print('one loop')
-    #         yield batch_dict, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
-
 
 
 class LoadBindingDB(BaseLoader):
@@ -571,6 +554,52 @@ class LoadCelegansHuman(BaseLoader):
                 id2emb.append(emb_dict[protein])
         del emb_dict
         gc.collect()
+        return id2emb
+
+class LoadChembl(BaseLoader):
+    """
+    Placeholder class for training of the chembl model
+    """
+
+    def load_data(self, dataPath, valid_size=0.1, test_size=0.1):
+        '''
+        Read file and return data as list of [drug, protein, label]
+        '''
+        print('\nReading the raw data...')
+        temp = []
+        file = open(os.path.join(dataPath, 'data.txt'), 'r')
+        for line in file.readlines():
+            if line == '':
+                break
+            drug, protein, label = line.strip().split(' ')
+            temp.append(np.array((drug, protein, int(label))))
+        file.close()
+        data = self.create_sets(temp, valid_size, test_size)
+        return data
+
+    def create_sets(self, temp, valid_size, test_size):
+        np.random.shuffle(temp)
+        data = {'train': [], 'valid': [], 'test': []}
+        samples = len(temp)
+        split1 = int((1 - valid_size - test_size) * samples)
+        split2 = int((1 - test_size) * samples)
+        data['train'] = temp[:split1]
+        data['valid'] = temp[split1:split2]
+        data['test'] = temp[split2:]
+        return data
+
+    def load_pembeddings(self):
+        '''
+        For all the proteins of the dataset, obtain the ELMO embeddings
+        for the sequences (embedding file should be of the format: prot_embedding_{datasetname}.pkl
+        '''
+        data = 'data'
+        path = os.path.join(data, 'embedding_files', f'prot_embedding_{self.dataPath.name}.pkl')
+        with open(path, 'rb') as emb_file:
+            emb_dict = pkl.load(emb_file)
+        id2emb = []
+        for protein in self.p2id.keys():
+            id2emb.append(emb_dict[protein])
         return id2emb
 
 
