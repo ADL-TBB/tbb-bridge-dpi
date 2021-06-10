@@ -393,16 +393,16 @@ class BaseLoader:
         for i in range((len(edges) + batchSize - 1) // batchSize):
             samples = edges[i * batchSize:(i + 1) * batchSize]
             pTokenizedNames, dTokenizedNames = [i[0] for i in samples], [i[1] for i in samples]
-            batch_dict = deepcopy(self.batch_dict)
+            new_batch = dict()
 
-            for feat in batch_dict.keys():
+            for feat in self.batch_dict.keys():
                 if feat in self.protein_feats:
-                    batch_dict[feat] = batch_dict[feat][pTokenizedNames].to(device)
+                    new_batch[feat] = self.batch_dict[feat][pTokenizedNames].to(device)
                 elif feat in self.drug_feats:
-                    batch_dict[feat] = batch_dict[feat][dTokenizedNames].to(device)
+                    new_batch[feat] = self.batch_dict[feat][dTokenizedNames].to(device)
 
-            batch_dict['res'] = True
-            yield batch_dict, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
+            new_batch['res'] = True
+            yield new_batch, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
 
     def random_batch_data_stream(self, batchSize=32, type='train', device='gpu', shuffle=True):
         edges = [i for i in self.eSeqData[type]]
@@ -412,16 +412,16 @@ class BaseLoader:
             for i in range((len(edges) + batchSize - 1) // batchSize):
                 samples = edges[i * batchSize:(i + 1) * batchSize]
                 pTokenizedNames, dTokenizedNames = [i[0] for i in samples], [i[1] for i in samples]
-                batch_dict = deepcopy(self.batch_dict)
+                new_batch = dict()
 
-                for feat in batch_dict.keys():
+                for feat in self.batch_dict.keys():
                     if feat in self.protein_feats:
-                        batch_dict[feat] = batch_dict[feat][pTokenizedNames].to(device)
+                        new_batch[feat] = self.batch_dict[feat][pTokenizedNames].to(device)
                     elif feat in self.drug_feats:
-                        batch_dict[feat] = batch_dict[feat][dTokenizedNames].to(device)
+                        new_batch[feat] = self.batch_dict[feat][dTokenizedNames].to(device)
 
-                batch_dict['res'] = True
-                yield batch_dict, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
+                new_batch['res'] = True
+                yield new_batch, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
 
 
 
