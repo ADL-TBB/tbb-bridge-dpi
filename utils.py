@@ -26,10 +26,12 @@ class BaseLoader:
         self.pSeqMaxLen = pSeqMaxLen
         self.dSeqMaxLen = dSeqMaxLen
         self._create_features()
+        
 
     def _create_features(self):
         # These data will be filled with append values in the methods called
         # down below.
+        self.create_ids = False 
         self.p2id, self.id2p = {}, []
         self.d2id, self.id2d = {}, []
         self.pSeqData = []
@@ -41,7 +43,18 @@ class BaseLoader:
 
         # Protein and drug data and their labels
         self.eSeqData, self.edgeLab = {}, {}
-        self.initialize_ID_data(self.data)
+
+        if self.create_ids:
+            self.initialize_ID_data(self.data)
+            with open('pickled_ids.pkl','wb') as f:
+                obj_list = [self.p2id, self.id2p, self.d2id, self.id2d, self.eSeqData, self.edgeLab, self.pSeqData, 
+                self.dMolData, self.dSeqData, self.dFeaData, self.dFinData, self.dSmilesData, self.pNameData, self.dNameData]
+                pkl.dump(obj_list, f)
+        else:
+            with open('pickled_ids.pkl','rb') as f:
+                data_obj = pkl.load(f)
+                [self.p2id, self.id2p, self.d2id, self.id2d, self.eSeqData, self.edgeLab,self.pSeqData,
+                self.dMolData, self.dSeqData, self.dFeaData, self.dFinData, self.dSmilesData, self.pNameData, self.dNameData] = data_obj
 
         # Check how many samples you have in training, test and validation sets
         self.trainSampleNum, self.validSampleNum, self.testSampleNum = len(
