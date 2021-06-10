@@ -29,3 +29,4 @@ build-backend = "poetry.core.masonry.api"
 [tool.poe.tasks]
 get-gxx = "conda install -c anaconda gxx_linux-64"
 get-torch-cuda = "conda install pytorch torchvision torchaudio cudatoolkit=11.1 -c pytorch -c conda-forge"
+get-torch-cuda-10 = "conda install pytorch torchvision torchaudio cudatoolkit=10.0 -c pytorch"
