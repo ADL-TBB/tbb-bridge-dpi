@@ -8,6 +8,7 @@ from rdkit import DataStructs
 from pathlib import Path
 from copy import deepcopy
 import pickle as pkl
+from tqdm import tqdm
 from sklearn.feature_extraction.text import CountVectorizer
 sys.path.insert(0, 'smiles_transformer')
 from smiles_transformer.build_vocab import WordVocab
@@ -554,20 +555,52 @@ class LoadChembl(BaseLoader):
     Placeholder class for training of the chembl model
     """
 
-    def load_data(self, dataPath, valid_size=0.1, test_size=0.1):
+        def load_data(self, data_path, valid_size=0.1, test_size=0.1):
         '''
         Read file and return data as list of [drug, protein, label]
+        Takes chembl2smiles and chembl2aaseq dictionaries as input
+        Reads interaction data from data_path
+        Creates and returns list with smiles, aa-seq, label
+        and create train/val/test set
         '''
-        print('\nReading the raw data...')
-        temp = []
-        file = open(os.path.join(dataPath, 'data.txt'), 'r')
-        for line in file.readlines():
-            if line == '':
-                break
-            drug, protein, label = line.strip().split(' ')
-            temp.append(np.array((drug, protein, int(label))))
-        file.close()
-        data = self.create_sets(temp, valid_size, test_size)
+
+        data = []
+        unavailable_smiles = []
+
+        with open(os.path.join(data_path, "chembl2smiles.pkl", "rb")) as f:
+            chembl2smiles = pkl.load(f)
+        with open(os.path.join(data_path, "chembl2aaseq.pkl", "rb")) as f:
+            chembl2aaseq = pkl.load(f)
+
+        f = Path("data/chembl/DEEPScreen_files/chembl27_preprocessed_filtered_act_inact_comps_10.0_20.0_blast_comp_0.2.txt")
+
+        for line in tqdm(f.readlines()):
+            # To make sure only examples for which aa-seq and SMILES are available are saved
+            save = True
+
+            line_split = line.strip().split('\t')
+            protein_info = line_split[0].split("_")
+            protein = protein_info[0]
+            active = True if protein_info[1] == "act" else False
+            drugs = line_split[1].strip().split(',')
+
+            if protein not in chembl2aaseq:
+                print("Amino acid sequence not available for", protein)
+                save = False
+            else:
+                protein_seq = chembl2aaseq[protein]
+
+            for drug in drugs:
+                if drug not in chembl2smiles:
+                    unavailable_smiles.append(drug)
+                else:
+                    smiles = chembl2smiles[drug]
+                    # Add all smiles, protein_seq, label to list
+                    if save:
+                        data.append(np.array((smiles, protein_seq, int(active))))
+        f.close()
+        print("{} drugs were not in chembl2smiles:".format(len(unavailable_smiles)))
+        data = self.create_sets(data, valid_size, test_size)
         return data
 
     def create_sets(self, temp, valid_size, test_size):
