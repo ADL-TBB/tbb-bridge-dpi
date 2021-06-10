@@ -555,7 +555,7 @@ class LoadChembl(BaseLoader):
     Placeholder class for training of the chembl model
     """
 
-        def load_data(self, data_path, valid_size=0.1, test_size=0.1):
+    def load_data(self, data_path, valid_size=0.1, test_size=0.1):
         '''
         Read file and return data as list of [drug, protein, label]
         Takes chembl2smiles and chembl2aaseq dictionaries as input
@@ -567,12 +567,13 @@ class LoadChembl(BaseLoader):
         data = []
         unavailable_smiles = []
 
-        with open(os.path.join(data_path, "chembl2smiles.pkl", "rb")) as f:
+        with open(os.path.join(data_path, "chembl2smiles.pkl"), mode="rb") as f:
             chembl2smiles = pkl.load(f)
-        with open(os.path.join(data_path, "chembl2aaseq.pkl", "rb")) as f:
+        with open(os.path.join(data_path, "chembl2aaseq.pkl"), mode="rb") as f:
             chembl2aaseq = pkl.load(f)
 
-        f = Path("data/chembl/DEEPScreen_files/chembl27_preprocessed_filtered_act_inact_comps_10.0_20.0_blast_comp_0.2.txt")
+        actinact_path = Path("data/chembl/DEEPScreen_files/chembl27_preprocessed_filtered_act_inact_comps_10.0_20.0_blast_comp_0.2.txt")
+        f = open(actinact_path, mode="r")
 
         for line in tqdm(f.readlines()):
             # To make sure only examples for which aa-seq and SMILES are available are saved

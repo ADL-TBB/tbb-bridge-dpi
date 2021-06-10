@@ -18,9 +18,9 @@ use p_Embedding_Seq_Bridge as model_name
 """
 
 # Choose dataset and modelfile name
-data = "celegans"
-model_name = "DTI_Bridge"
-save_path = "test_celegans"
+data = "chembl"  # folder name in /data
+model_name = "p_Embedding_Bridge"
+save_path = "chembl_model"
 
 data_path = Path(os.path.join("data", data))
 assert data_path.exists(), "Download the necessary data from the following link: " \
@@ -34,6 +34,7 @@ else: #"chembl"
     data_class = LoadChembl(dataPath=data_path, model_name=model_name)
 
 
+"""
 model = DTI_Bridge(outSize=128,
                   cHiddenSizeList=[1024],
                   fHiddenSizeList=[1024, 256],
@@ -42,7 +43,7 @@ model = DTI_Bridge(outSize=128,
                   hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'))
 
 """
-model class name correspond to model_name variable name, like:
+# model class name correspond to model_name variable name, like:
 
 model = p_Embedding_Bridge(outSize=128,
                   cHiddenSizeList=[1024],
@@ -50,7 +51,6 @@ model = p_Embedding_Bridge(outSize=128,
                   fSize=1024, cSize=8424, # change if kmer size changes, or use data_class.pContFeat.shape[1]
                   gcnHiddenSizeList=[128, 128], fcHiddenSizeList=[128], nodeNum=64,
                   hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'))
-"""
 
 model.train(data_class, trainSize=512, batchSize=512, epoch=128,
             stopRounds=-1, earlyStop=30,
