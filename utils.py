@@ -147,6 +147,10 @@ class BaseLoader:
 
             print("done\n")
 
+        else:
+            print('Invalid model_name for dataClass object')
+            exit(1)
+
     def load_data(self):
         '''Returns data in format [drug, protein, label]'''
         pass
