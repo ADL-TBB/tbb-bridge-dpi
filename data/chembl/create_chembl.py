@@ -95,8 +95,8 @@ def batch_create_smiles_data(data_path: Path, start_index=0, chunk_size=50, save
     chembl2smiles = dict()
     print("Mapping ChEMBL ID <--> Canonical SMILES...")
     for i in range(start_index, len(keys), chunk_size):
-        if i > start_index and i%save_iterations == 0:
-            filename = f"chembl2smiles_{str(i-save_iterations)}-{str(i)}.pkl"
+        if i > start_index and i % save_iterations == 0:
+            filename = f"chembl2smiles_{str(i - save_iterations)}-{str(i)}.pkl"
             with open(filename, mode='wb') as f:
                 pkl.dump(chembl2smiles, f)
             chembl2smiles = dict()
@@ -107,8 +107,9 @@ def batch_create_smiles_data(data_path: Path, start_index=0, chunk_size=50, save
 
         for act in tqdm(activities):
             chembl2smiles[act['molecule_chembl_id']] = act['canonical_smiles']
-        
+
     return chembl2smiles
+
 
 def create_smiles_data(data_path):
     """
@@ -141,15 +142,15 @@ def read_data(data_path, chembl2smiles, chembl2aaseq):
     """
     data = []
     unavailable_smiles = []
-    line_counter = 0
+    # line_counter = 0
 
     f = open(data_path, 'r')
     for line in f.readlines():
 
-        line_counter += 1
-        # Test run for first 20 lines
-        if line_counter > 20:
-            break
+        # line_counter += 1
+        # # Test run for first 20 lines
+        # if line_counter > 20:
+        #     break
 
         # To make sure only examples for which aa-seq and SMILES are available are saved
         save = True
@@ -194,5 +195,19 @@ def check_split_file(split_file_path: Path):
 
 
 if __name__ == "__main__":
-    check_split_file(actinact_path)  # Make the split file if it doesn't exist yet.
-    chembl2smiles = batch_create_smiles_data(actinact_path, start_index=0, chunk_size=200, save_iterations=5000)
+
+    with open("chembl2smiles.pkl", "rb") as f:
+        chembl2smiles = pkl.load(f)
+    with open("chembl2aaseq.pkl", "rb") as f:
+        chembl2aaseq = pkl.load(f)
+
+    data = read_data(
+        data_path="chembl27_preprocessed_filtered_act_inact_comps_10.0_20.0_blast_comp_0.2.txt",
+        chembl2smiles=chembl2smiles,
+        chembl2aaseq=chembl2aaseq)
+
+    with open("chembl_dataset.pkl", "wb") as f:
+        pkl.dump(data, f)
+
+    # check_split_file(actinact_path)  # Make the split file if it doesn't exist yet.
+    # chembl2smiles = batch_create_smiles_data(actinact_path, start_index=0, chunk_size=200, save_iterations=5000)

@@ -17,7 +17,7 @@ logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=lo
 
 
 class BaseLoader:
-    def __init__(self, dataPath, device='cuda', model_name='DTI_Bridge', pSeqMaxLen=1024, dSeqMaxLen=128, seed=42):
+    def __init__(self, dataPath, device='cuda', model_name='DTI_Bridge', pSeqMaxLen=1024, dSeqMaxLen=128, seed=42, save_d_names = True):
         np.random.seed(seed)
         self.device = device
         self.model_name = model_name
@@ -25,7 +25,9 @@ class BaseLoader:
         self.dataPath = dataPath
         self.pSeqMaxLen = pSeqMaxLen
         self.dSeqMaxLen = dSeqMaxLen
+        self.save_d_names = save_d_names
         self._create_features()
+        
 
     def _create_features(self):
         # These data will be filled with append values in the methods called
@@ -37,6 +39,10 @@ class BaseLoader:
         self.pNameData, self.dNameData = {}, {}
 
         # Import the data as {'train'/'valid'/'test': [drug, protein, label]}
+        if self.save_d_names: #If the self.save_d_names is flagged (only for bindingDB), the drug ids will as well be created 
+            self.drug_names = []
+            self.data, self.data_names = self.load_data(self.dataPath)
+        
         self.data = self.load_data(self.dataPath)
 
         # Protein and drug data and their labels
@@ -199,6 +205,7 @@ class BaseLoader:
         print("\nCreating IDs...")
         pCnt, dCnt = 0, 0
         for sub in ['train', 'valid', 'test']:
+            idx = 0
             self.pNameData[sub], self.dNameData[sub] = [], []
             id_data = []
             for drug, protein, label in data[sub]:
@@ -207,6 +214,9 @@ class BaseLoader:
                 if (self.create_drugID(drug, dCnt)):
                     self.get_drug_features(drug)
                     dCnt += 1
+                    if self.save_d_names:
+                        self.drug_names.append(self.data_names[sub][idx][0])
+                idx += 1
                 id_data.append([self.p2id[protein], self.d2id[drug], label])
             self.eSeqData[sub] = np.array(id_data, dtype=np.int32)
 
@@ -351,39 +361,6 @@ class BaseLoader:
                     pSeen[i] = True
         return np.array(pSeen, dtype=np.bool)
 
-    def get_onehot_proteins(self):
-        '''
-        Create one-hot encoded proteins.
-        For every protein a 2D array [protein length, amino acids]: for every row/place in the sequence
-        a 1 at the index of the amino acid that's present there.
-        '''
-        n_proteinIDs = len(self.id2p)
-        n_aminoIDs = len(self.id2am)
-        pOnehot = np.zeros((n_proteinIDs, self.pSeqMaxLen, n_aminoIDs), dtype=np.int8)
-        for i in range(n_proteinIDs):
-            protein = self.pSeqTokenized[i]
-            for j in range(self.pSeqMaxLen):
-                aaID = protein[j]
-                pOnehot[i, j, aaID] = 1
-        return pOnehot
-
-    def get_onehot_proteins_unclipped(self):
-        """
-        Create one-hot encoded proteins without defining a maximum length.
-        For every protein a 2D array [protein length, amino acids]: for every row/place in the sequence
-        a 1 at the index of the amino acid that's present there.
-        """
-        n_proteinIDs = len(self.id2p)
-        n_aminoIDs = len(self.id2am)
-        pList = []
-        for i in range(n_proteinIDs):
-            protein = self.id2p[i]
-            pOneHot = np.zeros((len(protein), len(self.id2am)), dtype=np.int8)
-            for j in range(len(protein)):
-                aaID = self.am2id[protein[j]]
-                pOneHot[j, aaID] = 1
-            pList.append(pOneHot)
-        return np.array(pList, dtype=np.object)
 
     def one_epoch_batch_data_stream(self, batchSize=32, type='valid', device='gpu'):
         edges = self.eSeqData[type]
@@ -423,12 +400,18 @@ class BaseLoader:
                 new_batch['res'] = True
                 yield new_batch, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
 
+
+                new_batch['res'] = True
+                yield new_batch, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
+
 class LoadBindingDB(BaseLoader):
     def load_data(self, dataPath):
         '''
         Read file and return data as list of [drug, protein, label]
         '''
         print('\nReading the raw data...\n')
+        if self.save_d_names:
+            data_ids = {'train': [], 'valid': [], 'test': []} #Only if you want to save drug labels
         data = {'train': [], 'valid': [], 'test': []}
         for folder in ['train', 'dev', 'test']:
             print("\tOpened " + folder)
@@ -457,9 +440,15 @@ class LoadBindingDB(BaseLoader):
                         label = '1'
                     if folder != 'dev':
                         data[folder].append(np.array((drug, protein, int(label))))
+                        if self.save_d_names:
+                            data_ids[folder].append(np.array((dID, pID, int(label))))
                     else:
                         data['valid'].append(np.array((drug, protein, int(label))))
+                        if self.save_d_names:
+                            data_ids[folder].append(np.array((dID, pID, int(label))))
                 file.close()
+        if self.save_d_names:
+            return data, data_ids
         return data
 
     def get_info(self, data_path):
@@ -482,13 +471,14 @@ class LoadBindingDB(BaseLoader):
         drugSMILES = [i.strip() for i in open(files[4], 'r').readlines()]
         return proteinID, proteinSequence, aminoacidID, drugID, drugSMILES   
 
-    def create_embeddings(self):
+
+    def load_pembeddings(self):
         '''
         For all the proteins of the dataset, obtain the ELMO embeddings
         for the sequences
         '''
         data = 'data'
-        path = os.path.join(data, 'embedding_files','prot_embedding_bindingDB.pkl')
+        path = os.path.join(data, 'embedding_files', 'prot_embedding_bindingdb.pkl')
         emb_file = open(path, 'rb')
         emb_dict = pkl.load(emb_file)
         emb_file.close()
@@ -498,13 +488,13 @@ class LoadBindingDB(BaseLoader):
         return id2emb     
 
 class LoadCelegansHuman(BaseLoader):
-    def load_data(self, data_path, valid_size=0.1, test_size=0.1):
+    def load_data(self, dataPath, valid_size=0.1, test_size=0.1):
         '''
         Read file and return data as list of [drug, protein, label]
         '''
         print('\nReading the raw data...')
         temp = []
-        file = open(os.path.join(data_path, 'data.txt'), 'r')
+        file = open(os.path.join(dataPath, 'data.txt'), 'r')
         for line in file.readlines():
             if line == '':
                 break
@@ -523,9 +513,11 @@ class LoadCelegansHuman(BaseLoader):
         data['train'] = temp[:split1]
         data['valid'] = temp[split1:split2]
         data['test'] = temp[split2:]
+        del temp
+        gc.collect()
         return data
     
-    def create_embeddings(self):
+    def load_pembeddings(self):
         '''
         Import the ELMO protein embeddings for either human of c.elegans dataset
         '''
@@ -534,9 +526,91 @@ class LoadCelegansHuman(BaseLoader):
             path = os.path.join(data, 'embedding_files','prot_embedding_human.pkl')
         else:
             path = os.path.join(data, 'embedding_files','prot_embedding_celegans.pkl')
-        emb_file = open(path, 'rb')
-        emb_dict = pkl.load(emb_file)
-        emb_file.close()
+
+        with open(path, 'rb') as emb_file:
+            emb_dict = pkl.load(emb_file)
+
+            id2emb = []
+            for protein in self.p2id.keys():
+                id2emb.append(emb_dict[protein])
+        del emb_dict
+        gc.collect()
+        return id2emb
+
+class LoadChembl(BaseLoader):
+    """
+    Placeholder class for training of the chembl model
+    """
+
+    def load_data(self, data_path, valid_size=0.1, test_size=0.1):
+        '''
+        Read file and return data as list of [drug, protein, label]
+        Takes chembl2smiles and chembl2aaseq dictionaries as input
+        Reads interaction data from data_path
+        Creates and returns list with smiles, aa-seq, label
+        and create train/val/test set
+        '''
+
+        data = []
+        unavailable_smiles = []
+
+        with open(os.path.join(data_path, "chembl2smiles.pkl"), mode="rb") as f:
+            chembl2smiles = pkl.load(f)
+        with open(os.path.join(data_path, "chembl2aaseq.pkl"), mode="rb") as f:
+            chembl2aaseq = pkl.load(f)
+
+        actinact_path = Path("data/chembl/DEEPScreen_files/chembl27_preprocessed_filtered_act_inact_comps_10.0_20.0_blast_comp_0.2.txt")
+        f = open(actinact_path, mode="r")
+
+        for line in tqdm(f.readlines()):
+            # To make sure only examples for which aa-seq and SMILES are available are saved
+            save = True
+
+            line_split = line.strip().split('\t')
+            protein_info = line_split[0].split("_")
+            protein = protein_info[0]
+            active = True if protein_info[1] == "act" else False
+            drugs = line_split[1].strip().split(',')
+
+            if protein not in chembl2aaseq:
+                print("Amino acid sequence not available for", protein)
+                save = False
+            else:
+                protein_seq = chembl2aaseq[protein]
+
+            for drug in drugs:
+                if drug not in chembl2smiles:
+                    unavailable_smiles.append(drug)
+                else:
+                    smiles = chembl2smiles[drug]
+                    # Add all smiles, protein_seq, label to list
+                    if save:
+                        data.append(np.array((smiles, protein_seq, int(active))))
+        f.close()
+        print("{} drugs were not in chembl2smiles:".format(len(unavailable_smiles)))
+        data = self.create_sets(data, valid_size, test_size)
+        return data
+
+    def create_sets(self, temp, valid_size, test_size):
+        np.random.shuffle(temp)
+        data = {'train': [], 'valid': [], 'test': []}
+        samples = len(temp)
+        split1 = int((1 - valid_size - test_size) * samples)
+        split2 = int((1 - test_size) * samples)
+        data['train'] = temp[:split1]
+        data['valid'] = temp[split1:split2]
+        data['test'] = temp[split2:]
+        return data
+
+    def load_pembeddings(self):
+        '''
+        For all the proteins of the dataset, obtain the ELMO embeddings
+        for the sequences (embedding file should be of the format: prot_embedding_{datasetname}.pkl
+        '''
+        data = 'data'
+        path = os.path.join(data, 'embedding_files', f'prot_embedding_{self.dataPath.name}.pkl')
+        with open(path, 'rb') as emb_file:
+            emb_dict = pkl.load(emb_file)
         id2emb = []
         for protein in self.p2id.keys():
             id2emb.append(emb_dict[protein])
