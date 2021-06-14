@@ -86,7 +86,7 @@ for experiment in experiments:
             model, useFeatures = train(method, data_class, save_path)
             model.to_eval_mode()
 
-            stream = data_class.unshuffled_data_stream(batchSize=12, type='test', device=torch.device('cuda'))
+            stream = data_class.random_batch_data_stream(batchSize=12, type='test', device=torch.device('cuda'), shuffle=False)
             YArr, Y_preArr = [], []
             i = 0
             while True:
