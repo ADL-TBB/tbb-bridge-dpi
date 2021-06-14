@@ -193,9 +193,9 @@ class MetricLog:
         plt.xticks(np.arange(0, max(x)+1, 16))
 
         plt.legend(fontsize=10)
-        plt.title('learning curve', fontsize=16)
-        plt.xlabel('epochs', fontsize=12)
-        plt.ylabel('loss', fontsize=12)
+        plt.title('learning curve', fontsize=18)
+        plt.xlabel('epochs', fontsize=14)
+        plt.ylabel('loss', fontsize=14)
 
         plt.savefig(self.plot_log, dpi=300)
 
