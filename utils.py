@@ -25,8 +25,9 @@ class BaseLoader:
         self.dataPath = dataPath
         self.pSeqMaxLen = pSeqMaxLen
         self.dSeqMaxLen = dSeqMaxLen
-        self._create_features()
         self.save_d_names = save_d_names
+        self._create_features()
+        
 
     def _create_features(self):
         # These data will be filled with append values in the methods called
