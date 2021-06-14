@@ -157,8 +157,8 @@ class MetricLog:
         self.write_header(header)
 
     def log_train_val(self, train, val):
-        train_temp = [f'{train[mtc]:6.3f}' for mtc in self.to_report] # log LOSS and additional params in to_report param
-        val_temp = [f'{val[mtc]:6.3f}' for mtc in self.to_report] # log LOSS and additional params in to_report param
+        train_temp = [f'{train[mtc]:.3f}' for mtc in self.to_report] # log LOSS and additional params in to_report param
+        val_temp = [f'{val[mtc]:.3f}' for mtc in self.to_report] # log LOSS and additional params in to_report param
 
         self.save_train.append(train_temp)
         self.save_val.append(val_temp)
