@@ -8,6 +8,7 @@ from rdkit import DataStructs
 from pathlib import Path
 from copy import deepcopy
 import pickle as pkl
+from tqdm import tqdm
 from sklearn.feature_extraction.text import CountVectorizer
 sys.path.insert(0, 'smiles_transformer')
 from smiles_transformer.build_vocab import WordVocab
@@ -16,7 +17,7 @@ logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=lo
 
 
 class BaseLoader:
-    def __init__(self, dataPath, device='cuda', model_name='DTI_Bridge', pSeqMaxLen=1024, dSeqMaxLen=128, seed=42):
+    def __init__(self, dataPath, device='cuda', model_name='DTI_Bridge', pSeqMaxLen=1024, dSeqMaxLen=128, seed=42, save_d_names = False):
         np.random.seed(seed)
         self.device = device
         self.model_name = model_name
@@ -25,19 +26,23 @@ class BaseLoader:
         self.pSeqMaxLen = pSeqMaxLen
         self.dSeqMaxLen = dSeqMaxLen
         self._create_features()
+        self.save_d_names = save_d_names
 
     def _create_features(self):
         # These data will be filled with append values in the methods called
         # down below.
         self.p2id, self.id2p = {}, []
         self.d2id, self.id2d = {}, []
-        self.drug_names = []
         self.pSeqData = []
         self.dMolData, self.dSeqData, self.dFeaData, self.dFinData, self.dSmilesData = [], [], [], [], []
         self.pNameData, self.dNameData = {}, {}
 
         # Import the data as {'train'/'valid'/'test': [drug, protein, label]}
-        self.data, self.data_names = self.load_data(self.dataPath)
+        if self.save_d_names and ('bindingdb' in self.dataPath): #If the self.save_d_names is flagged (only for bindingDB), the drug ids will as well be created 
+            self.drug_names = []
+            self.data, self.data_names = self.load_data(self.dataPath)
+        
+        self.data = self.load_data(self.dataPath)
 
         # Protein and drug data and their labels
         self.eSeqData, self.edgeLab = {}, {}
@@ -207,8 +212,9 @@ class BaseLoader:
                     pCnt += 1
                 if (self.create_drugID(drug, dCnt)):
                     self.get_drug_features(drug)
-                    self.drug_names.append(self.data_names[sub][idx][0])
                     dCnt += 1
+                    if self.save_d_names:
+                        self.drug_names.append(self.data_names[sub][idx][0])
                 idx += 1
                 id_data.append([self.p2id[protein], self.d2id[drug], label])
             self.eSeqData[sub] = np.array(id_data, dtype=np.int32)
@@ -354,39 +360,6 @@ class BaseLoader:
                     pSeen[i] = True
         return np.array(pSeen, dtype=np.bool)
 
-    def get_onehot_proteins(self):
-        '''
-        Create one-hot encoded proteins.
-        For every protein a 2D array [protein length, amino acids]: for every row/place in the sequence
-        a 1 at the index of the amino acid that's present there.
-        '''
-        n_proteinIDs = len(self.id2p)
-        n_aminoIDs = len(self.id2am)
-        pOnehot = np.zeros((n_proteinIDs, self.pSeqMaxLen, n_aminoIDs), dtype=np.int8)
-        for i in range(n_proteinIDs):
-            protein = self.pSeqTokenized[i]
-            for j in range(self.pSeqMaxLen):
-                aaID = protein[j]
-                pOnehot[i, j, aaID] = 1
-        return pOnehot
-
-    def get_onehot_proteins_unclipped(self):
-        """
-        Create one-hot encoded proteins without defining a maximum length.
-        For every protein a 2D array [protein length, amino acids]: for every row/place in the sequence
-        a 1 at the index of the amino acid that's present there.
-        """
-        n_proteinIDs = len(self.id2p)
-        n_aminoIDs = len(self.id2am)
-        pList = []
-        for i in range(n_proteinIDs):
-            protein = self.id2p[i]
-            pOneHot = np.zeros((len(protein), len(self.id2am)), dtype=np.int8)
-            for j in range(len(protein)):
-                aaID = self.am2id[protein[j]]
-                pOneHot[j, aaID] = 1
-            pList.append(pOneHot)
-        return np.array(pList, dtype=np.object)
 
     def one_epoch_batch_data_stream(self, batchSize=32, type='valid', device='gpu'):
         edges = self.eSeqData[type]
@@ -396,16 +369,16 @@ class BaseLoader:
         for i in range((len(edges) + batchSize - 1) // batchSize):
             samples = edges[i * batchSize:(i + 1) * batchSize]
             pTokenizedNames, dTokenizedNames = [i[0] for i in samples], [i[1] for i in samples]
-            batch_dict = deepcopy(self.batch_dict)
+            new_batch = dict()
 
-            for feat in batch_dict.keys():
+            for feat in self.batch_dict.keys():
                 if feat in self.protein_feats:
-                    batch_dict[feat] = batch_dict[feat][pTokenizedNames].to(device)
+                    new_batch[feat] = self.batch_dict[feat][pTokenizedNames].to(device)
                 elif feat in self.drug_feats:
-                    batch_dict[feat] = batch_dict[feat][dTokenizedNames].to(device)
+                    new_batch[feat] = self.batch_dict[feat][dTokenizedNames].to(device)
 
-            batch_dict['res'] = True
-            yield batch_dict, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
+            new_batch['res'] = True
+            yield new_batch, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
 
     def random_batch_data_stream(self, batchSize=32, type='train', device='gpu', shuffle=True):
         edges = [i for i in self.eSeqData[type]]
@@ -415,16 +388,16 @@ class BaseLoader:
             for i in range((len(edges) + batchSize - 1) // batchSize):
                 samples = edges[i * batchSize:(i + 1) * batchSize]
                 pTokenizedNames, dTokenizedNames = [i[0] for i in samples], [i[1] for i in samples]
-                batch_dict = deepcopy(self.batch_dict)
+                new_batch = dict()
 
-                for feat in batch_dict.keys():
+                for feat in self.batch_dict.keys():
                     if feat in self.protein_feats:
-                        batch_dict[feat] = batch_dict[feat][pTokenizedNames].to(device)
+                        new_batch[feat] = self.batch_dict[feat][pTokenizedNames].to(device)
                     elif feat in self.drug_feats:
-                        batch_dict[feat] = batch_dict[feat][dTokenizedNames].to(device)
+                        new_batch[feat] = self.batch_dict[feat][dTokenizedNames].to(device)
 
-                batch_dict['res'] = True
-                yield batch_dict, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
+                new_batch['res'] = True
+                yield new_batch, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
 
 
 
@@ -434,8 +407,9 @@ class LoadBindingDB(BaseLoader):
         Read file and return data as list of [drug, protein, label]
         '''
         print('\nReading the raw data...\n')
+        if self.save_d_names:
+            data_ids = {'train': [], 'valid': [], 'test': []} #Only if you want to save drug labels
         data = {'train': [], 'valid': [], 'test': []}
-        data_ids = {'train': [], 'valid': [], 'test': []}
         for folder in ['train', 'dev', 'test']:
             print("\tOpened " + folder)
             path = os.path.join(dataPath, folder)
@@ -463,12 +437,16 @@ class LoadBindingDB(BaseLoader):
                         label = '1'
                     if folder != 'dev':
                         data[folder].append(np.array((drug, protein, int(label))))
-                        data_ids[folder].append(np.array((dID, pID, int(label))))
+                        if self.save_d_names:
+                            data_ids[folder].append(np.array((dID, pID, int(label))))
                     else:
                         data['valid'].append(np.array((drug, protein, int(label))))
-                        data_ids['valid'].append(np.array((dID, pID, int(label))))
+                        if self.save_d_names:
+                            data_ids[folder].append(np.array((dID, pID, int(label))))
                 file.close()
-        return data, data_ids
+        if self.save_d_names:
+            return data, data_ids
+        return data
 
     def get_info(self, data_path):
         # protein: protein IDs (e.g. A4D1B5)
@@ -561,20 +539,53 @@ class LoadChembl(BaseLoader):
     Placeholder class for training of the chembl model
     """
 
-    def load_data(self, dataPath, valid_size=0.1, test_size=0.1):
+    def load_data(self, data_path, valid_size=0.1, test_size=0.1):
         '''
         Read file and return data as list of [drug, protein, label]
+        Takes chembl2smiles and chembl2aaseq dictionaries as input
+        Reads interaction data from data_path
+        Creates and returns list with smiles, aa-seq, label
+        and create train/val/test set
         '''
-        print('\nReading the raw data...')
-        temp = []
-        file = open(os.path.join(dataPath, 'data.txt'), 'r')
-        for line in file.readlines():
-            if line == '':
-                break
-            drug, protein, label = line.strip().split(' ')
-            temp.append(np.array((drug, protein, int(label))))
-        file.close()
-        data = self.create_sets(temp, valid_size, test_size)
+
+        data = []
+        unavailable_smiles = []
+
+        with open(os.path.join(data_path, "chembl2smiles.pkl"), mode="rb") as f:
+            chembl2smiles = pkl.load(f)
+        with open(os.path.join(data_path, "chembl2aaseq.pkl"), mode="rb") as f:
+            chembl2aaseq = pkl.load(f)
+
+        actinact_path = Path("data/chembl/DEEPScreen_files/chembl27_preprocessed_filtered_act_inact_comps_10.0_20.0_blast_comp_0.2.txt")
+        f = open(actinact_path, mode="r")
+
+        for line in tqdm(f.readlines()):
+            # To make sure only examples for which aa-seq and SMILES are available are saved
+            save = True
+
+            line_split = line.strip().split('\t')
+            protein_info = line_split[0].split("_")
+            protein = protein_info[0]
+            active = True if protein_info[1] == "act" else False
+            drugs = line_split[1].strip().split(',')
+
+            if protein not in chembl2aaseq:
+                print("Amino acid sequence not available for", protein)
+                save = False
+            else:
+                protein_seq = chembl2aaseq[protein]
+
+            for drug in drugs:
+                if drug not in chembl2smiles:
+                    unavailable_smiles.append(drug)
+                else:
+                    smiles = chembl2smiles[drug]
+                    # Add all smiles, protein_seq, label to list
+                    if save:
+                        data.append(np.array((smiles, protein_seq, int(active))))
+        f.close()
+        print("{} drugs were not in chembl2smiles:".format(len(unavailable_smiles)))
+        data = self.create_sets(data, valid_size, test_size)
         return data
 
     def create_sets(self, temp, valid_size, test_size):

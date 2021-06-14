@@ -34,7 +34,7 @@ else:
                    gcnHiddenSizeList=[128, 128], fcHiddenSizeList=[128], nodeNum=64,
                    hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'))
 
-
+#Perform the test
 model.load(path=model_path, map_location="cuda", dataClass=data_class)
 model.to_eval_mode()
 
