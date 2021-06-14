@@ -17,7 +17,7 @@ logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=lo
 
 
 class BaseLoader:
-    def __init__(self, dataPath, device='cuda', model_name='DTI_Bridge', pSeqMaxLen=1024, dSeqMaxLen=128, seed=42, save_d_names = False):
+    def __init__(self, dataPath, device='cuda', model_name='DTI_Bridge', pSeqMaxLen=1024, dSeqMaxLen=128, seed=42, save_d_names = True):
         np.random.seed(seed)
         self.device = device
         self.model_name = model_name
@@ -39,7 +39,7 @@ class BaseLoader:
         self.pNameData, self.dNameData = {}, {}
 
         # Import the data as {'train'/'valid'/'test': [drug, protein, label]}
-        if self.save_d_names and ('bindingdb' in self.dataPath): #If the self.save_d_names is flagged (only for bindingDB), the drug ids will as well be created 
+        if self.save_d_names: #If the self.save_d_names is flagged (only for bindingDB), the drug ids will as well be created 
             self.drug_names = []
             self.data, self.data_names = self.load_data(self.dataPath)
         
