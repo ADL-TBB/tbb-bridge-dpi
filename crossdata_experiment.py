@@ -37,38 +37,28 @@ def log(model_type, trainset, testset, training_data, valid_data, test_data):
 # Train model
 def train(method, data_class):
     if method == 'DTI_Bridge':
-        kmers, pSeq, FP, dSeq = True, True, True, True
-        pEmbeddings, ST_fingerprint = False, False
-        useFeatures={"pEmbeddings": pEmbeddings, "kmers": kmers, "pSeq": pSeq,
-                    "FP": FP, "dSeq": dSeq, "ST_fingerprint": ST_fingerprint}
-        print(f'Training DTI_Bridge with pEmbeddings: {useFeatures["pEmbeddings"]}, kmers: {useFeatures["kmers"]}, pSeq: {useFeatures["pSeq"]}, FP: {useFeatures["FP"]}, dSeq: {useFeatures["dSeq"]}, ST_fingerprint: {useFeatures["ST_fingerprint"]}\n')
+        print(f'Training DTI_Bridge with pEmbeddings\n')
         model = DTI_Bridge(outSize=128,
             cHiddenSizeList=[1024],
             fHiddenSizeList=[1024, 256],
             fSize=1024, cSize=data_class.pContFeat.shape[1],
             gcnHiddenSizeList=[128,128], fcHiddenSizeList=[128], nodeNum=64,
-            hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'), 
-            useFeatures=useFeatures)
+            hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'))
     else: # 'p_Embedding_Bridge'
-        pEmbeddings, dSeq = True, True
-        ST_fingerprint, FP, kmers, pSeq = False, False, False, False
-        useFeatures={"pEmbeddings": pEmbeddings, "kmers": kmers, "pSeq": pSeq,
-                    "FP": FP, "dSeq": dSeq, "ST_fingerprint": ST_fingerprint}
-        print(f'Training p_Embedding_Bridge with pEmbeddings: {useFeatures["pEmbeddings"]}, kmers: {useFeatures["kmers"]}, pSeq: {useFeatures["pSeq"]}, FP: {useFeatures["FP"]}, dSeq: {useFeatures["dSeq"]}, ST_fingerprint: {useFeatures["ST_fingerprint"]}\n')
+        print(f'Training p_Embedding_Bridge with pEmbeddings\n')
         model = p_Embedding_Bridge(outSize=128,
             cHiddenSizeList=[1024],
             fHiddenSizeList=[1024, 256],
-            fSize=1024, cSize=data_class.pContFeat.shape[1],
+            fSize=1024, cSize=8424,
             gcnHiddenSizeList=[128,128], fcHiddenSizeList=[128], nodeNum=64,
-            hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'), 
-            useFeatures=useFeatures)
+            hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'))
 
     model.train(data_class, trainSize=512, batchSize=512, epoch=128,
         stopRounds=-1, earlyStop=30,
         savePath=save_path, metrics="AUC", report=["ACC", "AUC", "LOSS"],
         preheat=0)
 
-    return model, useFeatures
+    return model
 
 # Test model
 def test(model, data_class):
@@ -99,24 +89,24 @@ for experiment in experiments:
         for i in range(repetitions):
             save_path = f"experiment_{i}_{method}_{experiment}"
             if experiment == ["bindingdb", "celegans"]:
-                data_class = Load_trainBDB_testCElegans(dataPath = [data_path_bdb, data_path_celegans])
+                data_class = Load_trainBDB_testCElegans(dataPath = [data_path_bdb, data_path_celegans], model_name=method, save_d_names=False)
             
             elif experiment == ["bindingdb", "human"]:
-                data_class = Load_trainBDB_testHuman(dataPath = [data_path_bdb, data_path_human])
+                data_class = Load_trainBDB_testHuman(dataPath = [data_path_bdb, data_path_human], model_name=method, save_d_names=False)
             
             elif experiment == ["human", "celegans"]:
-                data_class = Load_trainHuman_testCElegans(dataPath = [data_path_human, data_path_celegans])
+                data_class = Load_trainHuman_testCElegans(dataPath = [data_path_human, data_path_celegans], model_name=method, save_d_names=False)
             
             elif experiment == ["celegans", "human"]:
-                data_class = Load_trainCElegans_testHuman(dataPath = [data_path_celegans, data_path_human])
+                data_class = Load_trainCElegans_testHuman(dataPath = [data_path_celegans, data_path_human], model_name=method, save_d_names=False)
 
             elif experiment == ["human", "bindingdb"]:
-                data_class = Load_trainHuman_testBDB(dataPath = [data_path_human, data_path_bdb])
+                data_class = Load_trainHuman_testBDB(dataPath = [data_path_human, data_path_bdb], model_name=method, save_d_names=False)
 
             else: # ["celegans", "bindingdb"]
-                data_class = Load_trainCElegans_testBDB(dataPath = [data_path_celegans, data_path_bdb])
+                data_class = Load_trainCElegans_testBDB(dataPath = [data_path_celegans, data_path_bdb], model_name=method, save_d_names=False)
 
-            model, useFeatures = train(method, data_class)
+            model = train(method, data_class)
             train_res, valid_res, test_res = test(model, data_class)
 
             train_stats.append(train_res)

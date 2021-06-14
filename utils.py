@@ -401,9 +401,6 @@ class BaseLoader:
                 yield new_batch, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
 
 
-                new_batch['res'] = True
-                yield new_batch, torch.tensor([i[2] for i in samples], dtype=torch.float32).to(device)
-
 class LoadBindingDB(BaseLoader):
     def load_data(self, dataPath):
         '''
@@ -616,86 +613,8 @@ class LoadChembl(BaseLoader):
             id2emb.append(emb_dict[protein])
         return id2emb
 
-class LoadChembl(BaseLoader):
-    """
-    Placeholder class for training of the chembl model
-    """
 
-    def load_data(self, data_path, valid_size=0.1, test_size=0.1):
-        '''
-        Read file and return data as list of [drug, protein, label]
-        Takes chembl2smiles and chembl2aaseq dictionaries as input
-        Reads interaction data from data_path
-        Creates and returns list with smiles, aa-seq, label
-        and create train/val/test set
-        '''
 
-        data = []
-        unavailable_smiles = []
-
-        with open(os.path.join(data_path, "chembl2smiles.pkl"), mode="rb") as f:
-            chembl2smiles = pkl.load(f)
-        with open(os.path.join(data_path, "chembl2aaseq.pkl"), mode="rb") as f:
-            chembl2aaseq = pkl.load(f)
-
-        actinact_path = Path("data/chembl/DEEPScreen_files/chembl27_preprocessed_filtered_act_inact_comps_10.0_20.0_blast_comp_0.2.txt")
-        f = open(actinact_path, mode="r")
-
-        for line in tqdm(f.readlines()):
-            # To make sure only examples for which aa-seq and SMILES are available are saved
-            save = True
-
-            line_split = line.strip().split('\t')
-            protein_info = line_split[0].split("_")
-            protein = protein_info[0]
-            active = True if protein_info[1] == "act" else False
-            drugs = line_split[1].strip().split(',')
-
-            if protein not in chembl2aaseq:
-                print("Amino acid sequence not available for", protein)
-                save = False
-            else:
-                protein_seq = chembl2aaseq[protein]
-
-            for drug in drugs:
-                if drug not in chembl2smiles:
-                    unavailable_smiles.append(drug)
-                else:
-                    smiles = chembl2smiles[drug]
-                    # Add all smiles, protein_seq, label to list
-                    if save:
-                        data.append(np.array((smiles, protein_seq, int(active))))
-        f.close()
-        print("{} drugs were not in chembl2smiles:".format(len(unavailable_smiles)))
-        data = self.create_sets(data, valid_size, test_size)
-        return data
-
-    def create_sets(self, temp, valid_size, test_size):
-        np.random.shuffle(temp)
-        data = {'train': [], 'valid': [], 'test': []}
-        samples = len(temp)
-        split1 = int((1 - valid_size - test_size) * samples)
-        split2 = int((1 - test_size) * samples)
-        data['train'] = temp[:split1]
-        data['valid'] = temp[split1:split2]
-        data['test'] = temp[split2:]
-        return data
-
-    def load_pembeddings(self):
-        '''
-        For all the proteins of the dataset, obtain the ELMO embeddings
-        for the sequences (embedding file should be of the format: prot_embedding_{datasetname}.pkl
-        '''
-        data = 'data'
-        path = os.path.join(data, 'embedding_files', f'prot_embedding_{self.dataPath.name}.pkl')
-        with open(path, 'rb') as emb_file:
-            emb_dict = pkl.load(emb_file)
-        id2emb = []
-        for protein in self.p2id.keys():
-            id2emb.append(emb_dict[protein])
-        return id2emb
-
-# Classes for SARS-CoV-2 case study
 class LoadSarscov2_with_Celegans(BaseLoader):
     def load_data(self, data_path, valid_size=0.1):
         print('\nReading the raw data...')
@@ -731,7 +650,7 @@ class LoadSarscov2_with_Celegans(BaseLoader):
 
         return data
 
-    def create_embeddings(self):
+    def load_pembeddings(self):
         '''
         For all the proteins of the dataset, obtain the ELMO embeddings
         for the sequences
@@ -784,7 +703,7 @@ class LoadSarscov2_with_Human(BaseLoader):
 
         return data
 
-    def create_embeddings(self):
+    def load_pembeddings(self):
         '''
         For all the proteins of the dataset, obtain the ELMO embeddings
         for the sequences
@@ -874,7 +793,7 @@ class LoadSarscov2_with_BindingDB(BaseLoader):
         drugSMILES = [i.strip() for i in open(files[4], 'r').readlines()]
         return proteinID, proteinSequence, aminoacidID, drugID, drugSMILES
 
-    def create_embeddings(self):
+    def load_pembeddings(self):
         '''
         For all the proteins of the dataset, obtain the ELMO embeddings
         for the sequences
@@ -958,7 +877,7 @@ class Load_trainBDB_testCElegans(BaseLoader):
         drugSMILES = [i.strip() for i in open(files[4], 'r').readlines()]
         return proteinID, proteinSequence, aminoacidID, drugID, drugSMILES
 
-    def create_embeddings(self):
+    def load_pembeddings(self):
         '''
         For all the proteins of the dataset, obtain the ELMO embeddings
         for the sequences
@@ -1040,7 +959,7 @@ class Load_trainBDB_testHuman(BaseLoader):
         drugSMILES = [i.strip() for i in open(files[4], 'r').readlines()]
         return proteinID, proteinSequence, aminoacidID, drugID, drugSMILES
 
-    def create_embeddings(self):
+    def load_pembeddings(self):
         '''
         For all the proteins of the dataset, obtain the ELMO embeddings
         for the sequences
@@ -1095,7 +1014,7 @@ class Load_trainHuman_testCElegans(BaseLoader):
 
         return data
 
-    def create_embeddings(self):
+    def load_pembeddings(self):
         '''
         For all the proteins of the dataset, obtain the ELMO embeddings
         for the sequences
@@ -1150,7 +1069,7 @@ class Load_trainCElegans_testHuman(BaseLoader):
 
         return data
 
-    def create_embeddings(self):
+    def load_pembeddings(self):
         '''
         For all the proteins of the dataset, obtain the ELMO embeddings
         for the sequences
@@ -1234,7 +1153,7 @@ class Load_trainHuman_testBDB(BaseLoader):
         drugSMILES = [i.strip() for i in open(files[4], 'r').readlines()]
         return proteinID, proteinSequence, aminoacidID, drugID, drugSMILES
 
-    def create_embeddings(self):
+    def load_pembeddings(self):
         '''
         For all the proteins of the dataset, obtain the ELMO embeddings
         for the sequences
@@ -1318,7 +1237,7 @@ class Load_trainCElegans_testBDB(BaseLoader):
         drugSMILES = [i.strip() for i in open(files[4], 'r').readlines()]
         return proteinID, proteinSequence, aminoacidID, drugID, drugSMILES
 
-    def create_embeddings(self):
+    def load_pembeddings(self):
         '''
         For all the proteins of the dataset, obtain the ELMO embeddings
         for the sequences
