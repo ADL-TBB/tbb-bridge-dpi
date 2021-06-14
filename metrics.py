@@ -157,12 +157,14 @@ class MetricLog:
         self.write_header(header)
 
     def log_train_val(self, train, val):
-        train_temp = [f'{train[mtc]:.3f}' for mtc in self.to_report] # log LOSS and additional params in to_report param
-        val_temp = [f'{val[mtc]:.3f}' for mtc in self.to_report] # log LOSS and additional params in to_report param
-
+        train_temp = [train[mtc] for mtc in self.to_report] # log LOSS and additional params in to_report param
+        val_temp = [val[mtc] for mtc in self.to_report] # log LOSS and additional params in to_report param
         self.save_train.append(train_temp)
         self.save_val.append(val_temp)
-        self.write_log(train_temp, val_temp)
+
+        train_formatted = [f'{train[mtc]:.3f}' for mtc in self.to_report] # format to 3 digit floats
+        val_formatted = [f'{val[mtc]:.3f}' for mtc in self.to_report] # format to 3 digit floats
+        self.write_log(train_formatted, val_formatted)
 
     def write_header(self, header):
         with open(self.logger, 'a') as out:
@@ -194,7 +196,6 @@ class MetricLog:
         plt.title('learning curve', fontsize=16)
         plt.xlabel('epochs', fontsize=12)
         plt.ylabel('loss', fontsize=12)
-
 
         plt.savefig(self.plot_log, dpi=300)
 
