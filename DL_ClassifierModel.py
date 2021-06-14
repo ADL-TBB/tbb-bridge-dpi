@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import time
+from datetime import datetime
 import os
 from torch import nn as nn
 from nnLayer import *
@@ -91,6 +92,9 @@ class BaseClassifier:
               optimType='Adam', preheat=5, lr1=0.001, lr2=0.00003, momentum=0.9, weightDecay=0, isHigherBetter=True,
               metrics="AUC", report=["ACC", "AUC"],
               savePath='model'):
+
+        log_time_stamp = datetime.now().strftime('%m%d%H%M%S')
+        metric_log = MetricLog(savePath, log_time_stamp, report) # initialize metric log
         
         self.final_res = {'training':[], 'valid':[]}
         assert batchSize % trainSize == 0
@@ -158,15 +162,17 @@ class BaseClassifier:
                     
                 metrictor.set_data(Y_pre, Y)
                 print(f'[Total Train]', end='')
-                metrictor(report)
+                train_res = metrictor(report)
                 print(f'[Total Valid]', end='')
 
                 Y_pre, Y = self.calculate_y_prob_by_iterator(dataClass.one_epoch_batch_data_stream(
                     trainSize, type='valid', device=self.device))
 
                 metrictor.set_data(Y_pre, Y)
-                res = metrictor(report)
-                mtc = res[metrics]
+                val_res = metrictor(report)
+                metric_log.log_train_val(train_res, val_res) # log the train and val metrics
+
+                mtc = val_res[metrics]
                 schedulerRLR.step(mtc)
                 print('=================================')
 
@@ -209,6 +215,11 @@ class BaseClassifier:
             metrictor.set_data(Y_pre, Y)
             metrictor(report)
             res = metrictor(report) # Report test scores if there is a test set
+
+            calc_ROC(Y, Y_pre, savePath, timestamp=log_time_stamp, plot=True) # log and plot ROC
+            calc_conf_matrix(Y, Y_pre, savePath, timestamp=log_time_stamp, plot=True) # log and plot confusion matrix
+            metric_log.plot_curve() # plot learn curve
+
         print(f'================================')
         return res
 
