@@ -6,26 +6,31 @@ import numpy as np
 import os
 from pathlib import Path
 
-# Choose data and model
-dataset = "celegans" # celegans / human / bindingdb
-model_path = "TEST_celegans_996.pkl"
+# Choose dataset and modelfile name
+data = "chembl"  # folder name in /data
+model_name = "p_Embedding_Bridge"
+save_path = "chembl_model"
 
-data_path = Path(os.path.join("data", dataset))
+data_path = Path(os.path.join("data", data))
+assert data_path.exists(), "Download the necessary data from the following link: " \
+                           "https://raw.githubusercontent.com/masashitsubaki/CPI_prediction/master/dataset/celegans/original/data.txt"
 
-if dataset=='celegans' or dataset=='human':
-    data_class = LoadCelegansHuman(dataPath=data_path)
-else: #bindingdb
-    data_class = LoadBindingDB(dataPath=data_path)
+if data=="celegans" or data=="human":
+    data_class = LoadCelegansHuman(dataPath=data_path, model_name=model_name)
+elif data == "bindingdb":
+    data_class = LoadBindingDB(dataPath=data_path, model_name=model_name)
+else: #"chembl"
+    data_class = LoadChembl(dataPath=data_path, model_name=model_name)
 
 
-model = DTI_Bridge(outSize=128,
-                   cHiddenSizeList=[1024],
-                   fHiddenSizeList=[1024, 256],
-                   fSize=1024, cSize=data_class.pContFeat.shape[1],
-                   gcnHiddenSizeList=[128, 128], fcHiddenSizeList=[128], nodeNum=64,
-                   hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'))
+model = p_Embedding_Bridge(outSize=128,
+                  cHiddenSizeList=[1024],
+                  fHiddenSizeList=[1024, 256],
+                  fSize=1024, cSize=8424, # change if kmer size changes, or use data_class.pContFeat.shape[1]
+                  gcnHiddenSizeList=[128, 128], fcHiddenSizeList=[128], nodeNum=64,
+                  hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'))
 
-model.load(path=model_path, map_location="cuda", dataClass=data_class)
+model.load(path=save_path, map_location="cuda", dataClass=data_class)
 model.to_eval_mode()
 
 def seen_stats(data, seen_data, Y_heavi, Y):
@@ -67,5 +72,5 @@ print("\nNumber of training examples:", data_class.trainSampleNum)
 print("Number of valid examples:", data_class.validSampleNum)
 print("Number of test examples:", data_class.testSampleNum)
 
-get_metrics(dataset)
+get_metrics(data)
 
