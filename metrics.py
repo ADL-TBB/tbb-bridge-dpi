@@ -179,10 +179,14 @@ class MetricLog:
         with open(self.logger, 'a') as out:
             out.write(f'{",".join(train_mtc)},{",".join(val_mtc)}\n')
 
-    def write_best(self, train_mtc, val_mtc, test_mtc):
+    def write_best(self, train, val, test):
+        test_form = [f'{test[mtc]:.3f}' for mtc in self.to_report] # format to 3 digit floats
+        train_form = [f'{train[mtc]:.3f}' for mtc in self.to_report] # format to 3 digit floats
+        val_form = [f'{val[mtc]:.3f}' for mtc in self.to_report] # format to 3 digit floats
+
         with open(self.best_results, 'w') as out:
             out.write(f'{",".join(self.header_best)}\n')
-            out.write(f'{",".join(train_mtc)},{",".join(val_mtc)},{",".join(test_mtc)}\n')
+            out.write(f'{",".join(train_form)},{",".join(val_form)},{",".join(test_form)}\n')
 
     def plot_curve(self):
         """
