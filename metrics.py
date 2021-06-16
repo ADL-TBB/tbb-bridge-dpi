@@ -149,11 +149,13 @@ class MetricLog:
     def __init__(self, savePath, timestamp, to_report):
         Path("logs").mkdir(parents=True, exist_ok=True)
         self.logger = f'logs/train_val_{savePath}_{timestamp}.txt' # create log with unique timestamp
+        self.best_results = f'logs/best_{savePath}_{timestamp}.txt' # create log with unique timestamp
         self.plot_log = f'logs/learn_curve_{savePath}_{timestamp}.png' # create plot file with unique timestamp
         self.to_report = to_report
         self.save_train = list()
         self.save_val = list()
         header = [f'{mtc}_train' for mtc in to_report] + [f'{mtc}_valid' for mtc in to_report]
+        self.header_best =  header + [f'{mtc}_test' for mtc in to_report]
         self.write_header(header)
 
     def log_train_val(self, train, val):
@@ -176,6 +178,11 @@ class MetricLog:
         """
         with open(self.logger, 'a') as out:
             out.write(f'{",".join(train_mtc)},{",".join(val_mtc)}\n')
+
+    def write_best(self, train_mtc, val_mtc, test_mtc):
+        with open(self.best_results, 'w') as out:
+            out.write(f'{",".join(self.header_best)}\n')
+            out.write(f'{",".join(train_mtc)},{",".join(val_mtc)},{",".join(test_mtc)}\n')
 
     def plot_curve(self):
         """

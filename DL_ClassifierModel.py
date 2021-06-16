@@ -196,7 +196,7 @@ class BaseClassifier:
         Y_pre, Y = self.calculate_y_prob_by_iterator(dataClass.one_epoch_batch_data_stream(
             trainSize, type='train', device=self.device))
         metrictor.set_data(Y_pre, Y)
-        metrictor(report)
+        train_res = Metrictor(report)
         self.final_res['training'].append(metrictor.ACC())
         self.final_res['training'].append(metrictor.AUC())
 
@@ -204,7 +204,7 @@ class BaseClassifier:
         Y_pre, Y = self.calculate_y_prob_by_iterator(dataClass.one_epoch_batch_data_stream(
             trainSize, type='valid', device=self.device))
         metrictor.set_data(Y_pre, Y)
-        res = metrictor(report)
+        valid_res = res = metrictor(report) # assign two names so that we can distinguish between valid_res and test_res
         self.final_res['valid'].append(metrictor.ACC())
         self.final_res['valid'].append(metrictor.AUC())
 
@@ -214,13 +214,15 @@ class BaseClassifier:
                 trainSize, type='test', device=self.device))
             metrictor.set_data(Y_pre, Y)
             metrictor(report)
-            res = metrictor(report) # Report test scores if there is a test set
+            test_res = res = metrictor(report) # overwrites res if there is test set, res is returned
 
+            metric_log.write_best(train_res, valid_res, test_res)
             calc_ROC(Y, Y_pre, savePath, timestamp=log_time_stamp, plot=True) # log and plot ROC
             calc_conf_matrix(Y, Y_pre, savePath, timestamp=log_time_stamp, plot=True) # log and plot confusion matrix
             metric_log.plot_curve() # plot learn curve
 
         print(f'================================')
+
         return res
 
     def reset_parameters(self):
