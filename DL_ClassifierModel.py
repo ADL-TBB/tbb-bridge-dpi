@@ -196,7 +196,7 @@ class BaseClassifier:
         Y_pre, Y = self.calculate_y_prob_by_iterator(dataClass.one_epoch_batch_data_stream(
             trainSize, type='train', device=self.device))
         metrictor.set_data(Y_pre, Y)
-        train_res = Metrictor(report)
+        train_res = metrictor(report)
         self.final_res['training'].append(metrictor.ACC())
         self.final_res['training'].append(metrictor.AUC())
 
