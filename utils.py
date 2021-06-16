@@ -17,7 +17,7 @@ logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=lo
 
 
 class BaseLoader:
-    def __init__(self, dataPath, device='cuda', model_name='DTI_Bridge', pSeqMaxLen=1024, dSeqMaxLen=128, seed=42):
+    def __init__(self, dataPath, device='cuda', model_name='DTI_Bridge', pSeqMaxLen=1024, dSeqMaxLen=128, seed=42, create_ids=False):
         np.random.seed(seed)
         self.device = device
         self.model_name = model_name
@@ -25,13 +25,13 @@ class BaseLoader:
         self.dataPath = dataPath
         self.pSeqMaxLen = pSeqMaxLen
         self.dSeqMaxLen = dSeqMaxLen
+        self.create_ids = create_ids
         self._create_features()
         
 
     def _create_features(self):
         # These data will be filled with append values in the methods called
         # down below.
-        self.create_ids = False 
         self.p2id, self.id2p = {}, []
         self.d2id, self.id2d = {}, []
         self.pSeqData = []
