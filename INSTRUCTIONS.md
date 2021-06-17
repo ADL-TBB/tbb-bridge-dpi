@@ -57,6 +57,10 @@ A series of scripts to test different combinations of datasets, drug and protein
 - crossdata_experiment.py
 
   Experiment where the neural network model is trained on one specific dataset and its performance is tested on another.
+  
+- crossdata_experiment_chembl.py
+
+  Experiment using the model trained on our chEMBL dataset on BindingDB and human datasets.
 
 **Case studies**
 
