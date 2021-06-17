@@ -1,10 +1,10 @@
 # Instructions - The Bridge Builders
 
-On the *dev* branch, all material necessary for the reproduction of the results can be found. 
+In the *dev* branch, all material necessary for the reproduction of the results can be found. 
 
 **Setup files**
 
-Files to set the Python working environment up are env.yml, poetry.lock and pyproject.toml. For more information on how to install the anaconda environment used for the experiments, read the README.md file included in the repository.
+The files to set the Python working environment up are env.yml, poetry.lock and pyproject.toml. For more information on how to install the anaconda environment used for the experiments, read the README.md file included in the repository.
 
 **Basic implementation files**
 
@@ -16,7 +16,7 @@ The implementation files are the scripts used to configure the input data, build
 
 - Others.py
 
-  Contains a basic implementation for learning rate schedule optimization used in DL_CassifierModel.py
+  Contains a basic implementation for optimal learning rate scheduling used in DL_CassifierModel.py
 
 - utils.py
 
@@ -32,15 +32,15 @@ The implementation files are the scripts used to configure the input data, build
 
 - main.py
 
-  The basic testing script. After training, a pkl file with the model parameters will be dropped in a pre-defined directory. The model can be imported by main.py to test the performance on the test and validation set. 
+  The basic testing script. After training, a .pkl file with the model parameters will be dropped in a pre-defined directory. The model can be imported by main.py to test the performance on the test and validation set. 
 
 - metrics.py
 
-  Contains the besic implementation of train and test performance evaluation metrics (AUC, ACC, Precision, Recall, F1, Loss) and plotting functions for the loss and AUC during training.
+  Contains the basic implementation of train and test performance evaluation metrics (AUC, ACC, Precision, Recall, F1, Loss) and plotting functions for the loss and AUC during training.
 
 **Model combination and parameter exploration**
 
-A series of scripts to test different combinations of datasets, drug and protein embedding creation methods and hyperparameters thereof.
+A series of scripts to test different combinations of datasets, drug and protein embedding creation methods and hyperparameters.
 
 - combination_performance.py
 
@@ -48,7 +48,7 @@ A series of scripts to test different combinations of datasets, drug and protein
 
 - dropout_performance.py 
 
-  Experiment with the dropout value of the MLP networks involved in feature creation for proteins and drugs.
+  Experiments with the dropout value of the MLP networks involved in feature creation of proteins and drugs.
 
 - hypernodes_performance.py
 
@@ -56,14 +56,71 @@ A series of scripts to test different combinations of datasets, drug and protein
 
 - crossdata_experiment.py
 
-  Experiment where the neural network model is trained on one specific dataset and its test performance is tested on another.
+  Experiment where the neural network model is trained on one specific dataset and its performance is tested on another.
 
 **Case studies**
 
-Two case studies concerning SARS-CoV-2 and Mycobacterium tuberculosis are  implemented in the following scripts:
+Two case studies concerning SARS-CoV-2 and Mycobacterium tuberculosis are implemented in the following scripts:
 
 - predict_mtb.py
 - sarscov_experiment.py
+
+**Folder 1:  analysis_misclassified_examples**
+
+Comparison of the characteristics of misclassified examples between a run with the original model and one with a modified version using *SeqVec* [1] and *Morgan fingerprints* to embed proteins and drugs, respectively.
+
+- analysis folder
+
+  Contains the notebook with the inspection of the misclassified examples and all files necessary to yield it. An additional descriptive file called *file_description.txt* is included in such folder.
+
+- stats_generator folder
+
+  Contains the script used to generate the analyzed data and the trained models (.pkl files) employed to perform the prediction. 
+
+**Folder 2: data**
+
+Contains all data employed in the project. 
+
+- binindgdb
+
+  Refined dataset from https://github.com/IBM/InterpretableDTIP with protein/drug examples divided into train, test and validation sub-folders.
+
+- chembl
+
+  Personally created interaction dataset with active and inactive drug-protein compounds from the chEMBL database.
+
+- celegans / human
+
+  Balanced datasets of protein-compound interactions from https://github.com/masashitsubaki/CPI_prediction/tree/master/dataset with human and C.elegans examples.
+
+- embedding_files
+
+  Pre-embedded protein datasets using *SeqVec* as in https://github.com/Rostlab/SeqVec
+
+- smiles_trfm_model
+
+  Pre-trained model for embedding drugs as described in [2].
+
+- sarscov2
+
+  The dataset of the protein-drug interaction examples studied in SARS-CoV-2
+
+- mtb
+
+  The dataset of the protein-drug interaction examples studied in tuberculosis. 
+
+  
+
+**Folder 3: smiles_transformer**
+
+Contains the necessary scripts to embed drug SMILES using a pre-trained transformer model from [2].
+
+
+
+1. M. Heinzinger, A. Elnaggar, Y. Wang, C. Dallago, D. Nechaev, F. Matthes and B. Rost, 2019, Modeling aspects of the language of life through transfer-learning protein sequences
+
+2. S. Honda, S. Shi,, H.R. Ueda, 2019, SMILES Transformer: Pre-trained Molecular Fingerprint
+   for Low Data Drug Discovery
 
 
 
