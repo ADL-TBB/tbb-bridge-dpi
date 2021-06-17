@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 import torch
 
+
+
 #Select the dataset and the path/pickle file where the data will be saved
 model_path = "TEST_binding_db"
 model = 'DTI_bridge' #Change it with pEmbeddings for when you run the test with those
@@ -24,7 +26,7 @@ if model == 'DTI_bridge':
                    fHiddenSizeList=[1024, 256],
                    fSize=1024, cSize=data_class.pContFeat.shape[1],
                    gcnHiddenSizeList=[128, 128], fcHiddenSizeList=[128], nodeNum=64,
-                   hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'))
+                   hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'), save_d_names = True)
 
 else:
     model = p_Embedding_Bridge(outSize=128,
@@ -32,7 +34,7 @@ else:
                    fHiddenSizeList=[1024, 256],
                    fSize=1024, cSize=data_class.pContFeat.shape[1],
                    gcnHiddenSizeList=[128, 128], fcHiddenSizeList=[128], nodeNum=64,
-                   hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'))
+                   hdnDropout=0.5, fcDropout=0.5, device=torch.device('cuda'), save_d_names = True)
 
 #Perform the test
 model.load(path=model_path, map_location="cuda", dataClass=data_class)
