@@ -17,7 +17,7 @@ logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=lo
 
 
 class BaseLoader:
-    def __init__(self, dataPath, device='cuda', model_name='DTI_Bridge', pSeqMaxLen=1024, dSeqMaxLen=128, seed=42, save_d_names = True):
+    def __init__(self, dataPath, device='cuda', model_name='DTI_Bridge', pSeqMaxLen=1024, dSeqMaxLen=128, seed=42, save_d_names = False):
         np.random.seed(seed)
         self.device = device
         self.model_name = model_name
@@ -442,7 +442,7 @@ class LoadBindingDB(BaseLoader):
                     else:
                         data['valid'].append(np.array((drug, protein, int(label))))
                         if self.save_d_names:
-                            data_ids[folder].append(np.array((dID, pID, int(label))))
+                            data_ids['valid'].append(np.array((dID, pID, int(label))))
                 file.close()
         if self.save_d_names:
             return data, data_ids

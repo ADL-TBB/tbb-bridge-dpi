@@ -9,17 +9,17 @@ import torch
 
 log_file = 'results_combination_of_models.log'
 log_format = '%(asctime)s : %(levelname)s : %(message)s'
+fhandler = logging.FileHandler(filename=log_file, mode='a')
 logging.basicConfig(format=log_format, filename = log_file, level=logging.DEBUG)
 logger = logging.getLogger()
+logger.addHandler(fhandler)
 
 def log(setting, training_data, valid_data, test_data):
     logger.debug(f'Conditions --> pEmbeddings: {setting["pEmbeddings"]}, kmers: {setting["kmers"]}, pSeq: {setting["pSeq"]}, FP: {setting["FP"]}, dSeq: {setting["dSeq"]}, ST_fingerprint: {setting["ST_fingerprint"]}\n')
-    logger.info(f'Training --> AUC = {training_data[0]}, ACC = {training_data[1]}\n')
-    logger.info(f'Validation --> AUC = {valid_data[0]}, ACC = {valid_data[1]}\n')
-    logger.info(f'Test --> AUC = {test_data[0]}, ACC = {test_data[1]}\n')
+    logger.info(f'Training --> AUC = {training_data[1]}, ACC = {training_data[0]}\n')
+    logger.info(f'Validation --> AUC = {valid_data[1]}, ACC = {valid_data[0]}\n')
+    logger.info(f'Test --> AUC = {test_data[1]}, ACC = {test_data[0]}\n')
     logger.info('\n')
-
-
 
 #Training data binding DB
 data = "bindingdb"
@@ -29,15 +29,16 @@ save_path = "TEST_bindingdb"
 data_path = Path(os.path.join("data", data))
 assert data_path.exists()
 
-#Get the bindingDB class
-data_class = LoadBindingDB(dataPath=data_path)
-
-#Set up the test set
-test = np.array(data_class.eSeqData['test'])
 
 #Iterate on the separate possible methods
 for method in ['DTI_Bridge', 'ST_Bridge', 'p_Embedding_Bridge', 'p_Emb_ST_Bridge']:
+    #Get the bindingDB class
+    data_class = LoadBindingDB(dataPath=data_path, model_name = method)
+    
+    #Set up the test set
+    test = np.array(data_class.eSeqData['test'])
     if method == 'DTI_Bridge':
+        model_name = 'DTI_Bridge'
         for (kmers, pSeq) in [(True, True), (True, False), (False, True), (False, False)]:
             for (FP, dSeq) in [(True, True), (True, False), (False, True), (False, False)]:
                 if (kmers, pSeq, FP, dSeq) == (False, False, False, False):
@@ -175,8 +176,8 @@ for method in ['DTI_Bridge', 'ST_Bridge', 'p_Embedding_Bridge', 'p_Emb_ST_Bridge
                 stopRounds=-1, earlyStop=30,
                 savePath=save_path, metrics="AUC", report=["ACC", "AUC", "LOSS"],
                 preheat=0)
-            train_stats.append(model.final_res['training'])
-            valid_stats.append(model.final_res['valid'])
+            train_stats.extend([model.final_res['training']['ACC'], model.final_res['training']['AUC']])
+            valid_stats.extend([model.final_res['valid']['ACC'], model.final_res['valied']['AUC']])
             #Get test results
             model.to_eval_mode()
             Ypre, Y, seenbool = model.calculate_y_with_seenbool(data_class.one_epoch_batch_data_stream(batchSize=128, type='test', device=torch.device('cuda')))
