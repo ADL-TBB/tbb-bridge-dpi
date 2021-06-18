@@ -46,11 +46,11 @@ A series of scripts to test different combinations of datasets, drug and protein
 
   Train and test all combinations of modules and sub-modules for protein and drug embedding creation by averaging their performance over three independent runs.
 
-- dropout_performance.py 
+- dropout_performance.py (separate branch)
 
   Experiments with the dropout value of the MLP networks involved in feature creation of proteins and drugs.
 
-- hypernodes_performance.py
+- hypernodes_performance.py (separate branch)
 
   Experiment with the number of hypernodes in the graph neural network architecture.
 
