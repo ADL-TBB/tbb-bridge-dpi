@@ -1,5 +1,9 @@
 import numpy as np
+import pickle
+import seaborn as sns
 from sklearn import metrics as skmetrics
+from pathlib import Path
+import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -79,6 +83,132 @@ class Metrictor:
 
     def LOSS(self):
         return LOSS(self.Y_prob_pre, self.Y)
+
+
+def calc_ROC(y_test, y_score, savePath, timestamp, plot=True):
+    picklefile = f'logs/ROC_{savePath}_{timestamp}.pkl'  # create log with unique timestamp
+    plotfile = f'logs/plot_ROC_{savePath}_{timestamp}.png'  # create log with unique timestamp
+    all_metrics = dict()
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+
+    fpr['class'], tpr['class'], _ = skmetrics.roc_curve(y_test, y_score)
+    roc_auc['class'] = skmetrics.auc(fpr['class'], tpr['class'])
+
+    # Compute micro-average ROC curve and ROC area
+    fpr["micro"], tpr["micro"], _ = skmetrics.roc_curve(y_test.ravel(), y_score.ravel())
+    roc_auc["micro"] = skmetrics.auc(fpr["micro"], tpr["micro"])
+
+    all_metrics['fpr'] = fpr
+    all_metrics['tpr'] = tpr
+    all_metrics['roc_auc'] = roc_auc
+
+    pickle.dump(all_metrics, open(picklefile, 'wb'))
+
+    if plot:
+        plt.figure()
+        lw = 2
+        plt.plot(fpr['class'], tpr['class'], color='darkorange',
+                 lw=lw, label='ROC curve (area = %0.2f)' % roc_auc['class'])
+        plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate', fontsize=12)
+        plt.ylabel('True Positive Rate', fontsize=12)
+        plt.title('Receiver operating characteristic', fontsize=16)
+        plt.legend(loc="lower right", fontsize=8)
+        plt.savefig(plotfile, dpi=300)
+        plt.clf() # clear the plot object
+
+
+def calc_conf_matrix(y_true, y_pred, savePath, timestamp, plot=True):
+    logfile = f'logs/CM_{savePath}_{timestamp}.txt'  # create log with unique timestamp
+    plotfile = f'logs/plot_CM_{savePath}_{timestamp}.png'  # create log with unique timestamp
+    y_pred = np.round(np.clip(y_pred, 0, 1)) # predicted values from continuous to 0,1
+    tn, fp, fn, tp = skmetrics.confusion_matrix(y_true, y_pred).ravel()
+
+    header = ['TN', 'FP', 'FN', 'TP', '\n']
+    with open(logfile, 'a') as out:
+        out.write(','.join(header))
+        out.write(f'{tn},{fp},{fn},{tp}\n')
+
+    if plot:
+        sns.set(rc={'figure.figsize':(8,6), 'axes.labelsize': 14})
+        y_pred = np.round(np.clip(y_pred, 0, 1))
+        cm = skmetrics.confusion_matrix(y_true, y_pred, normalize=None)
+        ax = sns.heatmap(cm, annot=True, fmt='g', cmap=plt.cm.cividis)
+        ax.set(xlabel='Actual', ylabel='Predicted')
+        plt.savefig(plotfile, dpi=300)
+        plt.clf()  # clear the plot object
+
+class MetricLog:
+    """
+    log train and validation loss
+    """
+    def __init__(self, savePath, timestamp, to_report):
+        Path("logs").mkdir(parents=True, exist_ok=True)
+        self.logger = f'logs/train_val_{savePath}_{timestamp}.txt' # create log with unique timestamp
+        self.best_results = f'logs/best_{savePath}_{timestamp}.txt' # create log with unique timestamp
+        self.plot_log = f'logs/learn_curve_{savePath}_{timestamp}.png' # create plot file with unique timestamp
+        self.to_report = to_report
+        self.save_train = list()
+        self.save_val = list()
+        header = [f'{mtc}_train' for mtc in to_report] + [f'{mtc}_valid' for mtc in to_report]
+        self.header_best =  header + [f'{mtc}_test' for mtc in to_report]
+        self.write_header(header)
+
+    def log_train_val(self, train, val):
+        train_temp = [train[mtc] for mtc in self.to_report] # log LOSS and additional params in to_report param
+        val_temp = [val[mtc] for mtc in self.to_report] # log LOSS and additional params in to_report param
+        self.save_train.append(train_temp)
+        self.save_val.append(val_temp)
+
+        train_formatted = [f'{train[mtc]:.3f}' for mtc in self.to_report] # format to 3 digit floats
+        val_formatted = [f'{val[mtc]:.3f}' for mtc in self.to_report] # format to 3 digit floats
+        self.write_log(train_formatted, val_formatted)
+
+    def write_header(self, header):
+        with open(self.logger, 'a') as out:
+            out.write(f'{",".join(header)}\n')
+
+    def write_log(self, train_mtc, val_mtc):
+        """
+        write all metrics in to_report for train and test
+        """
+        with open(self.logger, 'a') as out:
+            out.write(f'{",".join(train_mtc)},{",".join(val_mtc)}\n')
+
+    def write_best(self, train, val, test):
+        test_form = [f'{test[mtc]:.3f}' for mtc in self.to_report] # format to 3 digit floats
+        train_form = [f'{train[mtc]:.3f}' for mtc in self.to_report] # format to 3 digit floats
+        val_form = [f'{val[mtc]:.3f}' for mtc in self.to_report] # format to 3 digit floats
+
+        with open(self.best_results, 'w') as out:
+            out.write(f'{",".join(self.header_best)}\n')
+            out.write(f'{",".join(train_form)},{",".join(val_form)},{",".join(test_form)}\n')
+
+    def plot_curve(self):
+        """
+        default learn curve plotting with just LOSS
+        """
+        idx = self.to_report.index('LOSS')
+        x = [i for i in range(1, len(self.save_train)+1)]
+
+        plt.figure(figsize=(10, 8))
+        fig, ax = plt.subplots()
+        ax.plot(x, [item[idx] for item in self.save_train], label='train loss', c='blue')
+        ax.plot(x, [item[idx] for item in self.save_val],label='validation loss', c='orange')
+        ax.tick_params(axis='both', which='major', labelsize=14)
+        ax.tick_params(axis='both', which='minor', labelsize=12)
+        plt.xticks(np.arange(0, max(x)+1, 16))
+
+        plt.legend(fontsize=12)
+        plt.title('Learning curve', fontsize=18)
+        plt.xlabel('Epochs', fontsize=16)
+        plt.ylabel('Loss', fontsize=16)
+
+        plt.savefig(self.plot_log, dpi=300)
 
 
 def ACC(Y_pre, Y):
