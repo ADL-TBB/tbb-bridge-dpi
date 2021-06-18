@@ -15,6 +15,7 @@ This repo houses an academic project for the seminar course at Leiden University
 - Install the rest of the packages by running `poetry install`
 - Install torch with cudatoolkit for version 11 using poe get-torch-cuda
 - Get gxx for linux (for rdkit support) in conda by running poe get-gxx
+- Install seaborn via `pip install seaborn`
 
 ## ReferencesInstall torch with cudatoolkit for version 11 using poe get-torch-cuda
 - The original repo that our project is based on can be found [here](https://github.com/DeepAAI/BridgeDPI) along with its [paper](https://arxiv.org/abs/2101.12547) [1].
