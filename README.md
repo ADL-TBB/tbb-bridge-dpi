@@ -10,7 +10,7 @@ This repo houses an academic project for the seminar course at Leiden University
 
 
 ## Getting started
-- Make sure you have conda installed on your machine. You can download it [here](https://conda.io/projects/conda/en/latest/user-guide/install/index.html)
+- Make sure you have conda (compatible with python 3.7) installed on your machine. You can download it [here](https://conda.io/projects/conda/en/latest/user-guide/install/index.html)
 - Install the conda environment by running `conda env create -f env.yml`
 - Install the rest of the packages by running `poetry install`
 - Install torch with cudatoolkit for version 11 using poe get-torch-cuda
