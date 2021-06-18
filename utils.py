@@ -535,10 +535,6 @@ class LoadCelegansHuman(BaseLoader):
         return id2emb
 
 class LoadChembl(BaseLoader):
-    """
-    Placeholder class for training of the chembl model
-    """
-
     def load_data(self, data_path, valid_size=0.1, test_size=0.1):
         '''
         Read file and return data as list of [drug, protein, label]
