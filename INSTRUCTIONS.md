@@ -79,7 +79,7 @@ Comparison of the characteristics of misclassified examples between a run with t
 
 - stats_generator folder
 
-  Contains the script used to generate the analyzed data and the trained models (.pkl files) employed to perform the prediction. 
+  Contains the trained models (.pkl files) employed to perform the prediction. 
 
 **Folder 2: data**
 
