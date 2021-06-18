@@ -10,7 +10,7 @@ The files to set the Python working environment up are env.yml, poetry.lock and 
 
 The implementation files are the scripts used to configure the input data, build the model, train and test it. 
 
--  nnLayer.py
+- nnLayer.py
 
   Contains a series of stand-alone Pytorch implementations of neural network architectures to integrate directly into models.
 
@@ -118,6 +118,11 @@ Contains all data employed in the project.
 **Folder 3: smiles_transformer**
 
 Contains the necessary scripts to embed drug SMILES using a pre-trained transformer model from [2].
+
+
+
+
+
 
 
 
